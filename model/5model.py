@@ -66,12 +66,12 @@ from tensorflow.keras.applications.xception import preprocess_input as xception_
 # 1. Mount Google Drive
 drive.mount('/content/drive')
 
-# 2. Đường dẫn đến dữ liệu
+# 2. Path to data
 drive_folder = "/content/drive/MyDrive/kaggle_data/aptos2019"
 extract_root = "/content/extracted_zip_files"
 os.makedirs(extract_root, exist_ok=True)
 
-# Giải nén các file ZIP nếu chưa giải (nếu đã giải thì bỏ qua)
+# Path to data and unzip the ZIP files if not already extracted (skip if already extracted)
 zip_files = glob.glob(os.path.join(drive_folder, "*.zip"))
 for zip_path in zip_files:
     zip_name = os.path.basename(zip_path).replace(".zip", "")
@@ -79,17 +79,17 @@ for zip_path in zip_files:
     os.makedirs(extract_path, exist_ok=True)
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_path)
-    print(f"✅ Đã giải nén: {zip_path} → {extract_path}")
+    print(f"✅ Successfully extracted: {zip_path} → {extract_path}")
 
-# 3. Đọc file CSV
+# 3. Read CSV file
 df_train = pd.read_csv(os.path.join(drive_folder, "train.csv"))
 df_test = pd.read_csv(os.path.join(drive_folder, "test.csv"))
 
-# 4. Định nghĩa hàm xử lý ảnh: cắt, resize và tăng cường ảnh
+# 4. Define image processing functions: crop, resize, and augment images
 def crop_image_from_gray_to_color(img, tol=7):
     """
-    Cắt bỏ các vùng không cần thiết (đặc biệt là các cạnh tối) của ảnh dựa trên thông tin từ ảnh xám,
-    sau đó áp dụng vùng cắt này lên ảnh màu gốc.
+    Crop unnecessary areas (especially dark edges) of the image based on the grayscale image,
+    then apply the crop to the original color image.
     """
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     mask = gray > tol
@@ -102,27 +102,27 @@ def crop_image_from_gray_to_color(img, tol=7):
 
 def load_ben_color(path, sigmaX=10, IMG_SIZE=244):
     """
-    Load ảnh từ đường dẫn, cắt bỏ biên tối dựa trên ảnh xám, resize và tăng cường ảnh bằng GaussianBlur.
+    Load an image from the path, crop dark borders based on the grayscale image, resize, and augment with GaussianBlur.
     """
     image = cv2.imread(path)
     if image is None:
-        raise ValueError(f"Không thể đọc được ảnh từ đường dẫn: {path}")
-    # Chuyển BGR sang RGB
+        raise ValueError(f"Unable to read image from path: {path}")
+    # Convert BGR to RGB
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # Cắt ảnh theo vùng sáng
+    # Crop image based on bright areas
     image = crop_image_from_gray_to_color(image, tol=7)
-    # Resize ảnh về kích thước mong muốn
+    # Resize image to desired size
     image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
-    # Tăng cường ảnh bằng GaussianBlur và weighted addition
+    # Augment image with GaussianBlur and weighted addition
     image = cv2.addWeighted(image, 4, cv2.GaussianBlur(image, (0, 0), sigmaX), -4, 128)
     return image
 
-# 5. Xử lý và lưu ảnh đã xử lý vào một thư mục tạm thời trên Colab
-train_img_folder = os.path.join(extract_root, "train_images")  # Thư mục chứa ảnh gốc
-processed_folder = "/content/processed_train_images"          # Thư mục lưu ảnh đã xử lý
+# 5. Process and save processed images to a temporary directory on Colab
+train_img_folder = os.path.join(extract_root, "train_images")  # Directory containing original images
+processed_folder = "/content/processed_train_images"           # Directory to save processed images
 os.makedirs(processed_folder, exist_ok=True)
 
-processed_ids = []  # Lưu lại id của các ảnh đã được xử lý thành công
+processed_ids = []  # Store IDs of successfully processed images
 
 for idx, row in df_train.iterrows():
     img_filename = f"{row['id_code']}.png"
@@ -130,46 +130,47 @@ for idx, row in df_train.iterrows():
 
     try:
         proc_img = load_ben_color(img_path, sigmaX=10, IMG_SIZE=244)
-        # cv2.imwrite lưu ảnh theo định dạng BGR nên chuyển từ RGB sang BGR
+        # cv2.imwrite saves images in BGR format, so convert from RGB to BGR
         proc_img_bgr = cv2.cvtColor(proc_img, cv2.COLOR_RGB2BGR)
         save_path = os.path.join(processed_folder, img_filename)
         cv2.imwrite(save_path, proc_img_bgr)
         processed_ids.append(row['id_code'])
     except Exception as e:
-        print(f"Lỗi khi xử lý ảnh {img_filename}: {e}")
+        print(f"Error processing image {img_filename}: {e}")
 
-print(f"Đã xử lý thành công {len(processed_ids)} ảnh.")
+print(f"Successfully processed {len(processed_ids)} images.")
 
-# 6. Cập nhật DataFrame chỉ với các ảnh đã xử lý thành công
+# 6. Update DataFrame with only successfully processed images
 df_train_processed = df_train[df_train['id_code'].isin(processed_ids)].copy()
 
-# 7. Chia dữ liệu thành tập train và validation dựa trên file CSV
+# 7. Split data into train and validation sets based on the CSV file
 x = df_train_processed['id_code']
 y = df_train_processed['diagnosis']
 
-# Xáo trộn dữ liệu để đảm bảo tính ngẫu nhiên
+# Shuffle data to ensure randomness
 x, y = shuffle(x, y, random_state=42)
 
-# Chia tập train+validation và test (80% - 20%)
+# Split into train+validation and test sets (80% - 20%)
 x_temp, test_x, y_temp, test_y = train_test_split(x, y, test_size=0.20, stratify=y, random_state=42)
 
-# Chia tập train và validation (85% train, 15% val trong 80% dữ liệu ban đầu)
+# Split into train and validation sets (85% train, 15% val from the 80% initial data)
 train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=0.15/0.80, stratify=y_temp, random_state=42)
 
-# In thông tin kiểm tra
+# Print information for verification
 print("Train X size:", len(train_x))
 print("Train y size:", len(train_y))
 print("Valid X size:", len(valid_x))
 print("Valid y size:", len(valid_y))
 print("Test X size:", len(test_x))
 print("Test y size:", len(test_y))
-# Cấu hình chung
+
+# General configuration
 WORKERS = 2
 CHANNEL = 3
 SIZE = 224
 NUM_CLASSES = 5
 
-# Chuyển đổi nhãn sang one-hot
+# Convert labels to one-hot
 if len(train_y.shape) == 1 or train_y.shape[1] != NUM_CLASSES:
     train_y_multi = to_categorical(train_y, num_classes=NUM_CLASSES)
     valid_y_multi = to_categorical(valid_y, num_classes=NUM_CLASSES)
@@ -179,53 +180,52 @@ else:
     valid_y_multi = valid_y
     test_y_multi = test_y
 
-# Định nghĩa My_Generator
+# Define My_Generator
 class My_Generator(tf.keras.utils.Sequence):
     def __init__(self, image_filenames, labels, batch_size, is_train=False,
-                     mix=False, augment=False, size1=224, size2=299, model_type="default",
-                     balance_classes=False):
-            self.image_filenames = np.array(image_filenames)
-            self.labels = np.array(labels)
-            self.batch_size = batch_size
-            self.is_train = is_train
-            self.is_augment = augment
-            self.is_mix = mix
-            self.model_type = str(model_type).lower()
-            self.n_classes = self.labels.shape[1] if self.labels.ndim > 1 else int(max(self.labels) + 1)
-            if "inceptionv3" in self.model_type or "xception" in self.model_type:
-                self.target_size = (size2, size2)
-            else:
-                self.target_size = (size1, size1)
-            self.base_path = "/content/processed_train_images/"
-            if self.is_augment and self.is_train:
-                self.augmenter = A.Compose([
-                    A.OneOf([
-                        A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0, p=1),
-                        A.MultiplicativeNoise(multiplier=(0.9, 1.1), per_channel=True, p=1),
-                        A.RandomBrightnessContrast(brightness_limit=0, contrast_limit=0.1, p=1)
-                    ], p=0.5),
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
-                    A.CropAndPad(percent=(-0.1, 0), p=0.5)
-                ])
-            self.rare_augmenter = A.Compose([
+                 mix=False, augment=False, size1=224, size2=299, model_type="default",
+                 balance_classes=False):
+        self.image_filenames = np.array(image_filenames)
+        self.labels = np.array(labels)
+        self.batch_size = batch_size
+        self.is_train = is_train
+        self.is_augment = augment
+        self.is_mix = mix
+        self.model_type = str(model_type).lower()
+        self.n_classes = self.labels.shape[1] if self.labels.ndim > 1 else int(max(self.labels) + 1)
+        if "inceptionv3" in self.model_type or "xception" in self.model_type:
+            self.target_size = (size2, size2)
+        else:
+            self.target_size = (size1, size1)
+        self.base_path = "/content/processed_train_images/"
+        if self.is_augment and self.is_train:
+            self.augmenter = A.Compose([
+                A.OneOf([
+                    A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0, p=1),
+                    A.MultiplicativeNoise(multiplier=(0.9, 1.1), per_channel=True, p=1),
+                    A.RandomBrightnessContrast(brightness_limit=0, contrast_limit=0.1, p=1)
+                ], p=0.5),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
-                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.7),
-                A.GaussNoise(p=0.5),
-                A.Rotate(limit=30, p=0.5),
-                A.RandomScale(scale_limit=0.2, p=0.5),
-                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
-                A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5)
+                A.CropAndPad(percent=(-0.1, 0), p=0.5)
             ])
-            self.class_counts = self._compute_initial_class_counts()
-            self.augmented_class_counts = self.class_counts.copy()
-            self.class_weights = None
-            if self.is_train and balance_classes:
-                self.balance_classes()
-            if self.is_train:
-                self.on_epoch_end()
-
+        self.rare_augmenter = A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.7),
+            A.GaussNoise(p=0.5),
+            A.Rotate(limit=30, p=0.5),
+            A.RandomScale(scale_limit=0.2, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
+            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5)
+        ])
+        self.class_counts = self._compute_initial_class_counts()
+        self.augmented_class_counts = self.class_counts.copy()
+        self.class_weights = None
+        if self.is_train and balance_classes:
+            self.balance_class()
+        if self.is_train:
+            self.on_epoch_end()
 
     def _compute_initial_class_counts(self):
         labels = np.argmax(self.labels, axis=1) if self.labels.ndim > 1 else self.labels
@@ -240,25 +240,25 @@ class My_Generator(tf.keras.utils.Sequence):
         return class_weights / np.min(class_weights[np.isfinite(class_weights)])
 
     def get_class_weights(self):
-        """Trả về trọng số lớp hiện tại để sử dụng trong huấn luyện."""
+        """Return the current class weights for training."""
         return self.class_weights
 
     def balance_classes(self):
         class_counts = self._compute_initial_class_counts()
-        max_count = class_counts[0]  # Sử dụng số lượng mẫu của lớp 0 làm mục tiêu
+        max_count = class_counts[0]  # Use the number of samples in class 0 as the target
 
-        print(f"Số lượng mẫu ban đầu: {class_counts}")
-        print(f"Số lượng mẫu mục tiêu cho mỗi lớp (dựa trên lớp 0): {max_count}")
+        print(f"Initial sample counts: {class_counts}")
+        print(f"Target sample count per class (based on class 0): {max_count}")
 
         new_filenames = []
         new_labels = []
         for cls in range(self.n_classes):
             current_count = class_counts[cls]
             if current_count == 0:
-                print(f"Lớp {cls} không có mẫu, bỏ qua.")
+                print(f"Class {cls} has no samples, skipping.")
                 continue
             if cls == 3:
-                target_count = int(max_count * 1.3)  # Lớp 3 được tăng thêm 30%
+                target_count = int(max_count * 1.3)  # Class 3 is increased by 30%
             else:
                 target_count = max_count
             if current_count < target_count:
@@ -280,7 +280,7 @@ class My_Generator(tf.keras.utils.Sequence):
                         new_labels.append(np.array(label, dtype=self.labels.dtype))
                         self.augmented_class_counts[cls] += 1
                     else:
-                        print(f"Lỗi khi lưu ảnh tăng cường {new_img_id}")
+                        print(f"Error saving augmented image {new_img_id}")
 
         if new_labels:
             new_labels_array = np.array(new_labels)
@@ -289,11 +289,11 @@ class My_Generator(tf.keras.utils.Sequence):
             self.image_filenames = np.concatenate([self.image_filenames, new_filenames])
             self.labels = np.concatenate([self.labels, new_labels_array])
 
-        # Không gọi on_epoch_end() ở đây để tránh tính trọng số lớp ngay lập tức
+        # Do not call on_epoch_end() here to avoid recalculating class weights immediately
 
-        # Kiểm tra số lượng mẫu sau khi cân bằng
+        # Check sample counts after balancing
         updated_counts = self._compute_initial_class_counts()
-        print(f"Số lượng mẫu sau khi cân bằng và tăng lớp 3: {updated_counts}")
+        print(f"Sample counts after balancing and augmenting class 3: {updated_counts}")
 
     def augment_weak_classes(self, weak_classes, augment_factor=2):
         new_filenames = []
@@ -314,7 +314,7 @@ class My_Generator(tf.keras.utils.Sequence):
                         new_labels.append(np.array(label, dtype=self.labels.dtype))
                         self.augmented_class_counts[label_class] += 1
                     else:
-                        print(f"Lỗi khi lưu ảnh tăng cường {new_img_id}")
+                        print(f"Error saving augmented image {new_img_id}")
         if new_labels:
             new_labels_array = np.array(new_labels)
             if new_labels_array.ndim == 1:
@@ -333,22 +333,22 @@ class My_Generator(tf.keras.utils.Sequence):
     def on_epoch_end(self):
         if self.is_train:
             self.image_filenames, self.labels = shuffle(self.image_filenames, self.labels)
-            # Tính trọng số lớp vào cuối mỗi epoch
+            # Calculate class weights at the end of each epoch
             self.class_weights = self._compute_class_weights()
-            print(f"Trọng số lớp sau epoch: {self.class_weights}")
-            print(f"Số lượng mẫu tăng cường: {self.augmented_class_counts}")
+            print(f"Class weights after epoch: {self.class_weights}")
+            print(f"Augmented sample counts: {self.augmented_class_counts}")
 
     def _load_image(self, img_id):
         img_path = os.path.join(self.base_path, f"{img_id}.png")
         try:
             img = cv2.imread(img_path)
             if img is None:
-                raise ValueError(f"Hình ảnh không tìm thấy hoặc bị hỏng: {img_path}")
+                raise ValueError(f"Image not found or corrupted: {img_path}")
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, self.target_size)
             return img
         except Exception as e:
-            print(f"Lỗi khi tải hình ảnh {img_id}: {str(e)}")
+            print(f"Error loading image {img_id}: {str(e)}")
             return None
 
     def _generate_batch(self, batch_x, batch_y, augment=False):
@@ -402,7 +402,7 @@ class My_Generator(tf.keras.utils.Sequence):
                 mixed_y[i] = y[i]
         return mixed_x, mixed_y
 
-# Hàm tạo mô hình
+# Function to create model
 def create_model(input_shape, n_out, model_type, weights_path=None, weights="imagenet"):
     input_tensor = Input(shape=input_shape)
     if model_type == "resnet50":
@@ -432,18 +432,18 @@ def create_model(input_shape, n_out, model_type, weights_path=None, weights="ima
     model = Model(input_tensor, final_output)
     return model
 
-# Hàm lấy lớp tích chập cuối cùng
+# Function to get the last convolutional layer
 def get_last_conv_layer(model, model_type):
-    """Xác định lớp tích chập cuối cùng dựa trên loại mô hình."""
+    """Identify the last convolutional layer based on the model type."""
     model_type = model_type.lower()
     for layer in reversed(model.layers):
         if 'conv' in layer.name.lower() or 'block' in layer.name.lower() or 'mixed' in layer.name.lower():
             if len(layer.output.shape) == 4:
-                print(f"Lớp tích chập cuối cùng cho {model_type}: {layer.name}")
+                print(f"Last convolutional layer for {model_type}: {layer.name}")
                 return layer.name
-    raise ValueError(f"Không tìm thấy lớp tích chập 4D cho mô hình {model_type}")
+    raise ValueError(f"No 4D convolutional layer found for model {model_type}")
 
-# Hàm tính Grad-CAM
+# Function to compute Grad-CAM
 def compute_gradcam(model, img_array, last_conv_layer_name, class_index, model_type):
     grad_model = tf.keras.models.Model(
         inputs=[model.inputs],
@@ -478,18 +478,18 @@ def compute_gradcam(model, img_array, last_conv_layer_name, class_index, model_t
     superimposed_img = cv2.addWeighted(img, 0.6, heatmap, 0.4, 0.0)
     return heatmap, superimposed_img
 
-# Hàm trích xuất đặc trưng 2D và 4D cho meta-learning
+# Function to extract 2D and 4D features for meta-learning
 def extract_features(model, generator, steps, model_type, save_path):
-    """Trích xuất đặc trưng 2D và 4D từ mô hình."""
-    # Lấy tên lớp convolution cuối cùng
+    """Extract 2D and 4D features from the model."""
+    # Get the name of the last convolutional layer
     last_conv_layer_name = get_last_conv_layer(model, model_type)
 
-    # Tạo mô hình đặc trưng
+    # Create feature model
     feature_model = Model(
         inputs=model.input,
         outputs=[
-            model.get_layer(last_conv_layer_name).output,  # Đặc trưng 4D
-            model.get_layer('global_avg_pool').output      # Đặc trưng 2D
+            model.get_layer(last_conv_layer_name).output,  # 4D features
+            model.get_layer('global_avg_pool').output      # 2D features
         ]
     )
 
@@ -497,7 +497,7 @@ def extract_features(model, generator, steps, model_type, save_path):
     features_2d = []
     labels = []
 
-    # Trích xuất đặc trưng từ generator
+    # Extract features from generator
     for i in range(steps):
         batch_images, batch_labels = generator[i]
         batch_features_4d, batch_features_2d = feature_model.predict(batch_images, verbose=0)
@@ -505,17 +505,17 @@ def extract_features(model, generator, steps, model_type, save_path):
         features_2d.append(batch_features_2d)
         labels.append(batch_labels)
 
-    # Chuyển thành mảng NumPy
+    # Convert to NumPy arrays
     features_4d = np.concatenate(features_4d, axis=0)
     features_2d = np.concatenate(features_2d, axis=0)
     labels = np.concatenate(labels, axis=0)
 
-    # Lưu đặc trưng
+    # Save features
     np.savez(save_path, features_4d=features_4d, features_2d=features_2d, labels=labels)
-    print(f"Đã lưu đặc trưng tại {save_path}: 4D shape {features_4d.shape}, 2D shape {features_2d.shape}")
+    print(f"Saved features at {save_path}: 4D shape {features_4d.shape}, 2D shape {features_2d.shape}")
     return features_4d, features_2d, labels
 
-# Cấu hình mô hình
+# Model configuration
 model_configs = {
     # "xception": {
     #     "model_type": "xception",
@@ -693,7 +693,7 @@ class LossHistoryCallback(Callback):
         plt.close()
         print(f"Saved loss plot to {save_path}")
 
-# Huấn luyện và xử lý
+# Training and processing
 batch_size = 32
 resized_train_x = train_x.values
 resized_valid_x = valid_x.values
@@ -701,11 +701,11 @@ resized_test_x = test_x.values
 
 early_stopping = EarlyStopping(monitor='accuracy', patience=7, restore_best_weights=True, verbose=1, mode='max')
 
-# Kiểm tra dữ liệu
-assert 'train_x' in globals() and 'valid_x' in globals() and 'test_x' in globals(), "train_x, valid_x, hoặc test_x không được định nghĩa"
-assert 'train_y' in globals() and 'valid_y' in globals() and 'test_y' in globals(), "train_y, valid_y, hoặc test_y không được định nghĩa"
-assert callable(create_model), "create_model không phải là hàm"
-assert 'My_Generator' in globals(), "My_Generator không được định nghĩa"
+# Check data
+assert 'train_x' in globals() and 'valid_x' in globals() and 'test_x' in globals(), "train_x, valid_x, or test_x not defined"
+assert 'train_y' in globals() and 'valid_y' in globals() and 'test_y' in globals(), "train_y, valid_y, or test_y not defined"
+assert callable(create_model), "create_model is not a function"
+assert 'My_Generator' in globals(), "My_Generator not defined"
 
 print("train_y shape:", train_y.shape)
 print("valid_y shape:", valid_y.shape)
@@ -714,13 +714,13 @@ print("train_y_multi shape:", train_y_multi.shape)
 print("valid_y_multi shape:", valid_y_multi.shape)
 print("test_y_multi shape:", test_y_multi.shape)
 
-# Vòng lặp huấn luyện
+# Training loop
 meta_features = {}
 meta_save_dir = "/content/drive/MyDrive/working/meta_features_aptos"
 os.makedirs(meta_save_dir, exist_ok=True)
 
 for model_name, config in model_configs.items():
-    print(f"\n==> Đang huấn luyện mô hình {model_name} ...")
+    print(f"\n==> Training model {model_name} ...")
     if "inceptionv3" in config["model_type"].lower() or "xception" in config["model_type"].lower():
         model_input_shape = (299, 299, 3)
         img_size = 299
@@ -734,9 +734,9 @@ for model_name, config in model_configs.items():
         balance_classes=True
     )
     try:
-        print(f"Số lượng mẫu: {train_generator.augmented_class_counts}")
+        print(f"Sample counts: {train_generator.augmented_class_counts}")
     except AttributeError:
-        print("Không truy cập được augmented_class_counts, tiếp tục huấn luyện...")
+        print("Unable to access augmented_class_counts, continuing training...")
     valid_generator = My_Generator(
         resized_valid_x, valid_y_multi, batch_size,
         is_train=False, size1=SIZE, size2=299, model_type=config["model_type"]
@@ -749,7 +749,7 @@ for model_name, config in model_configs.items():
     if class_weights is None:
         class_weights = np.ones(NUM_CLASSES)
     class_weight = {i: float(w) for i, w in enumerate(class_weights)}
-    print(f"Trọng số lớp ban đầu: {class_weight}")
+    print(f"Initial class weights: {class_weight}")
     weights_path = config.get("weights_path", None)
     pretrained_weights = config.get("weights", "imagenet")
     model = create_model(
@@ -814,9 +814,9 @@ for model_name, config in model_configs.items():
         balance_classes=True
     )
     try:
-        print(f"Số lượng mẫu (mixup): {train_mixup.augmented_class_counts}")
+        print(f"Sample counts (mixup): {train_mixup.augmented_class_counts}")
     except AttributeError:
-        print("Không truy cập được augmented_class_counts (mixup), tiếp tục huấn luyện...")
+        print("Unable to access augmented_class_counts (mixup), continuing training...")
     augment_callback = DynamicRareClassAugmentationCallback(
         train_generator=train_mixup,
         valid_generator=valid_generator,
@@ -826,12 +826,12 @@ for model_name, config in model_configs.items():
     )
     epochs = 30
     for epoch in range(epochs):
-        print(f"\nBắt đầu epoch {epoch + 1} cho mô hình {model_name}")
+        print(f"\nStarting epoch {epoch + 1} for model {model_name}")
         class_weights = train_mixup.get_class_weights()
         if class_weights is None:
             class_weights = np.ones(NUM_CLASSES)
         class_weight = {i: float(w) for i, w in enumerate(class_weights)}
-        print(f"Trọng số lớp cho epoch {epoch + 1}: {class_weight}")
+        print(f"Class weights for epoch {epoch + 1}: {class_weight}")
         model.fit(
             train_mixup,
             steps_per_epoch=int(np.ceil(len(train_mixup.image_filenames) / batch_size)),
@@ -844,7 +844,7 @@ for model_name, config in model_configs.items():
         )
     final_save_path = config["save_path"].replace('.h5', '_final.keras')
     model.save(final_save_path, overwrite=True)
-    print(f"Đã lưu mô hình cuối cùng tại {final_save_path}")
+    print(f"Saved final model at {final_save_path}")
     loss_history.plot_and_save_loss(config["model_type"], save_dir="/content/drive/MyDrive/working/")
     if qwk_callback.best_y_true is not None and qwk_callback.best_y_pred is not None:
         cm = confusion_matrix(qwk_callback.best_y_true, qwk_callback.best_y_pred, labels=[0, 1, 2, 3, 4])
@@ -860,10 +860,10 @@ for model_name, config in model_configs.items():
         plt.close()
         print(f"Saved best confusion matrix to {save_cm_path}")
     else:
-        print(f"Không có best QWK được ghi nhận cho mô hình {config['model_type']}, không vẽ biểu đồ.")
+        print(f"No best QWK recorded for model {config['model_type']}, no plot generated.")
 
-    # Trích xuất đặc trưng 2D và 4D cho meta-learning
-    print(f"\n==> Trích xuất đặc trưng 2D và 4D cho mô hình {model_name} ...")
+    # Extract 2D and 4D features for meta-learning
+    print(f"\n==> Extracting 2D and 4D features for model {model_name} ...")
     train_steps = int(np.ceil(len(train_x) / batch_size))
     train_save_path = os.path.join(meta_save_dir, f"{model_name}_train_features.npz")
     train_features_4d, train_features_2d, train_labels = extract_features(
@@ -871,7 +871,7 @@ for model_name, config in model_configs.items():
     )
     meta_features[f"{model_name}_train_2d"] = train_features_2d
     meta_features[f"{model_name}_train_4d"] = train_features_4d
-    print(f"Đã trích xuất đặc trưng train: 2D shape {train_features_2d.shape}, 4D shape {train_features_4d.shape}")
+    print(f"Extracted train features: 2D shape {train_features_2d.shape}, 4D shape {train_features_4d.shape}")
 
     valid_steps = int(np.ceil(len(valid_x) / batch_size))
     valid_save_path = os.path.join(meta_save_dir, f"{model_name}_valid_features.npz")
@@ -880,7 +880,7 @@ for model_name, config in model_configs.items():
     )
     meta_features[f"{model_name}_valid_2d"] = valid_features_2d
     meta_features[f"{model_name}_valid_4d"] = valid_features_4d
-    print(f"Đã trích xuất đặc trưng valid: 2D shape {valid_features_2d.shape}, 4D shape {valid_features_4d.shape}")
+    print(f"Extracted valid features: 2D shape {valid_features_2d.shape}, 4D shape {valid_features_4d.shape}")
 
     test_steps = int(np.ceil(len(test_x) / batch_size))
     test_save_path = os.path.join(meta_save_dir, f"{model_name}_test_features.npz")
@@ -889,10 +889,10 @@ for model_name, config in model_configs.items():
     )
     meta_features[f"{model_name}_test_2d"] = test_features_2d
     meta_features[f"{model_name}_test_4d"] = test_features_4d
-    print(f"Đã trích xuất đặc trưng test: 2D shape {test_features_2d.shape}, 4D shape {test_features_4d.shape}")
+    print(f"Extracted test features: 2D shape {test_features_2d.shape}, 4D shape {test_features_4d.shape}")
 
-    # Tính và lưu Grad-CAM trên tập test
-    print(f"\n==> Tính Grad-CAM cho mô hình {model_name} trên tập test ...")
+    # Compute and save Grad-CAM on the test set
+    print(f"\n==> Computing Grad-CAM for model {model_name} on the test set ...")
     last_conv_layer_name = get_last_conv_layer(model, config["model_type"])
     gradcam_save_dir = f"/content/drive/MyDrive/working/gradcam_aptos_{config['model_type']}"
     os.makedirs(gradcam_save_dir, exist_ok=True)
@@ -925,28 +925,28 @@ for model_name, config in model_configs.items():
         original_img = np.uint8(original_img)
         original_path = os.path.join(gradcam_save_dir, f"sample_{i}_original.png")
         cv2.imwrite(original_path, cv2.cvtColor(original_img, cv2.COLOR_RGB2BGR))
-        print(f"Đã lưu ảnh gốc tại {original_path}")
+        print(f"Saved original image at {original_path}")
         heatmap_path = os.path.join(gradcam_save_dir, f"sample_{i}_heatmap.png")
         cv2.imwrite(heatmap_path, heatmap)
-        print(f"Đã lưu heatmap tại {heatmap_path}")
+        print(f"Saved heatmap at {heatmap_path}")
         superimposed_path = os.path.join(gradcam_save_dir, f"sample_{i}_gradcam_true_{true_class}_pred_{pred_class}.png")
         cv2.imwrite(superimposed_path, cv2.cvtColor(superimposed_img, cv2.COLOR_RGB2BGR))
-        print(f"Đã lưu ảnh Grad-CAM tại {superimposed_path}")
+        print(f"Saved Grad-CAM image at {superimposed_path}")
 
-    # Kiểm tra trên tập test
-    print(f"\n==> Đang kiểm tra mô hình {model_name} trên tập test ...")
+    # Evaluate on test set
+    print(f"\n==> Evaluating model {model_name} on test set ...")
     steps_test = int(np.ceil(len(test_x) / batch_size))
     y_pred_test = model.predict(test_generator, steps=steps_test, verbose=1)
     y_true_test = np.argmax(test_y_multi, axis=1)
     y_pred_classes_test = np.argmax(y_pred_test, axis=1)
     qwk_test = cohen_kappa_score(y_true_test, y_pred_classes_test, labels=[0, 1, 2, 3, 4], weights='quadratic')
-    print(f"QWK trên tập test: {qwk_test:.4f}")
+    print(f"QWK on test set: {qwk_test:.4f}")
     accuracy_test = accuracy_score(y_true_test, y_pred_classes_test)
-    print(f"Độ chính xác trên tập test: {accuracy_test:.4f}")
+    print(f"Accuracy on test set: {accuracy_test:.4f}")
     f1_test = f1_score(y_true_test, y_pred_classes_test, average=None, labels=[0, 1, 2, 3, 4])
     sensitivity_test = recall_score(y_true_test, y_pred_classes_test, average=None, labels=[0, 1, 2, 3, 4])
-    print(f"F1-score cho từng lớp trên tập test: {[f'{f1:.4f}' for f1 in f1_test]}")
-    print(f"Độ nhạy cho từng lớp trên tập test: {[f'{sens:.4f}' for sens in sensitivity_test]}")
+    print(f"F1-score per class on test set: {[f'{f1:.4f}' for f1 in f1_test]}")
+    print(f"Sensitivity per class on test set: {[f'{sens:.4f}' for sens in sensitivity_test]}")
     specificity_test = []
     cm = confusion_matrix(y_true_test, y_pred_classes_test, labels=[0, 1, 2, 3, 4])
     for cls in range(NUM_CLASSES):
@@ -954,30 +954,30 @@ for model_name, config in model_configs.items():
         fp = np.sum(cm[:, cls]) - cm[cls, cls]
         specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
         specificity_test.append(specificity)
-    print(f"Độ đặc hiệu cho từng lớp trên tập test: {[f'{spec:.4f}' for spec in specificity_test]}")
+    print(f"Specificity per class on test set: {[f'{spec:.4f}' for spec in specificity_test]}")
     precision_test = precision_score(y_true_test, y_pred_classes_test, average=None, labels=[0, 1, 2, 3, 4])
-    print(f"Độ chính xác cho từng lớp trên tập test: {[f'{prec:.4f}' for prec in precision_test]}")
+    print(f"Precision per class on test set: {[f'{prec:.4f}' for prec in precision_test]}")
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
                 xticklabels=[0, 1, 2, 3, 4],
                 yticklabels=[0, 1, 2, 3, 4])
-    plt.title(f'Ma trận nhầm lẫn tập test - QWK: {qwk_test:.4f} ({config["model_type"]})')
-    plt.xlabel('Dự đoán')
-    plt.ylabel('Thật')
+    plt.title(f'Test Confusion Matrix - QWK: {qwk_test:.4f} ({config["model_type"]})')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
     save_cm_test_path = f"/content/drive/MyDrive/working/test_confusion_matrix_{config['model_type']}.png"
     plt.savefig(save_cm_test_path)
     plt.close()
-    print(f"Đã lưu ma trận nhầm lẫn tập test tại {save_cm_test_path}")
+    print(f"Saved test confusion matrix to {save_cm_test_path}")
 
-# Lưu đặc trưng meta-learning
+# Save meta-learning features
 for key, features in meta_features.items():
     np.save(os.path.join(meta_save_dir, f"{key}.npy"), features)
-    print(f"Đã lưu đặc trưng {key} tại {os.path.join(meta_save_dir, f'{key}.npy')}")
+    print(f"Saved features {key} at {os.path.join(meta_save_dir, f'{key}.npy')}")
 
-# Xử lý đặc trưng 4D và kết hợp cho meta-learning
+# Process 4D features and combine for meta-learning
 def reduce_4d_to_2d(features_4d):
-    """Giảm chiều đặc trưng 4D bằng global average pooling."""
-    return np.mean(features_4d, axis=(1, 2))  # Trung bình theo chiều không gian
+    """Reduce 4D features to 2D using global average pooling."""
+    return np.mean(features_4d, axis=(1, 2))  # Average over spatial dimensions
 
 model_names = ["xception", "resnet50", "efficientnetb0", "inceptionv3", "densenet121"]
 combined_train_features_2d = []
@@ -985,7 +985,7 @@ combined_valid_features_2d = []
 combined_test_features_2d = []
 
 for model_name in model_names:
-    # Tải đặc trưng 2D
+    # Load 2D features
     train_2d_path = os.path.join(meta_save_dir, f"{model_name}_train_2d.npy")
     valid_2d_path = os.path.join(meta_save_dir, f"{model_name}_valid_2d.npy")
     test_2d_path = os.path.join(meta_save_dir, f"{model_name}_test_2d.npy")
@@ -993,19 +993,19 @@ for model_name in model_names:
     if os.path.exists(train_2d_path):
         train_features_2d = np.load(train_2d_path)
         combined_train_features_2d.append(train_features_2d)
-        print(f"Đã tải đặc trưng 2D train cho {model_name}: shape {train_features_2d.shape}")
+        print(f"Loaded 2D train features for {model_name}: shape {train_features_2d.shape}")
 
     if os.path.exists(valid_2d_path):
         valid_features_2d = np.load(valid_2d_path)
         combined_valid_features_2d.append(valid_features_2d)
-        print(f"Đã tải đặc trưng 2D valid cho {model_name}: shape {valid_features_2d.shape}")
+        print(f"Loaded 2D valid features for {model_name}: shape {valid_features_2d.shape}")
 
     if os.path.exists(test_2d_path):
         test_features_2d = np.load(test_2d_path)
         combined_test_features_2d.append(test_features_2d)
-        print(f"Đã tải đặc trưng 2D test cho {model_name}: shape {test_features_2d.shape}")
+        print(f"Loaded 2D test features for {model_name}: shape {test_features_2d.shape}")
 
-    # Tải đặc trưng 4D và giảm chiều
+    # Load 4D features and reduce dimensionality
     train_npz_path = os.path.join(meta_save_dir, f"{model_name}_train_features.npz")
     valid_npz_path = os.path.join(meta_save_dir, f"{model_name}_valid_features.npz")
     test_npz_path = os.path.join(meta_save_dir, f"{model_name}_test_features.npz")
@@ -1015,33 +1015,33 @@ for model_name in model_names:
         train_features_4d = train_data['features_4d']
         train_features_4d_reduced = reduce_4d_to_2d(train_features_4d)
         combined_train_features_2d.append(train_features_4d_reduced)
-        print(f"Đã tải và giảm chiều đặc trưng 4D train cho {model_name}: shape {train_features_4d_reduced.shape}")
+        print(f"Loaded and reduced 4D train features for {model_name}: shape {train_features_4d_reduced.shape}")
 
     if os.path.exists(valid_npz_path):
         valid_data = np.load(valid_npz_path)
         valid_features_4d = valid_data['features_4d']
         valid_features_4d_reduced = reduce_4d_to_2d(valid_features_4d)
         combined_valid_features_2d.append(valid_features_4d_reduced)
-        print(f"Đã tải và giảm chiều đặc trưng 4D valid cho {model_name}: shape {valid_features_4d_reduced.shape}")
+        print(f"Loaded and reduced 4D valid features for {model_name}: shape {valid_features_4d_reduced.shape}")
 
     if os.path.exists(test_npz_path):
         test_data = np.load(test_npz_path)
         test_features_4d = test_data['features_4d']
         test_features_4d_reduced = reduce_4d_to_2d(test_features_4d)
         combined_test_features_2d.append(test_features_4d_reduced)
-        print(f"Đã tải và giảm chiều đặc trưng 4D test cho {model_name}: shape {test_features_4d_reduced.shape}")
+        print(f"Loaded and reduced 4D test features for {model_name}: shape {test_features_4d_reduced.shape}")
 
-# Kết hợp đặc trưng 2D và 4D (sau giảm chiều)
+# Combine 2D and 4D (after reduction) features
 combined_train_features = np.concatenate(combined_train_features_2d, axis=1)
 combined_valid_features = np.concatenate(combined_valid_features_2d, axis=1)
 combined_test_features = np.concatenate(combined_test_features_2d, axis=1)
 
-print(f"Shape đặc trưng train kết hợp: {combined_train_features.shape}")
-print(f"Shape đặc trưng valid kết hợp: {combined_valid_features.shape}")
-print(f"Shape đặc trưng test kết hợp: {combined_test_features.shape}")
+print(f"Shape of combined train features: {combined_train_features.shape}")
+print(f"Shape of combined valid features: {combined_valid_features.shape}")
+print(f"Shape of combined test features: {combined_test_features.shape}")
 
-# Lưu đặc trưng kết hợp
+# Save combined features
 np.save(os.path.join(meta_save_dir, "combined_train_features.npy"), combined_train_features)
 np.save(os.path.join(meta_save_dir, "combined_valid_features.npy"), combined_valid_features)
 np.save(os.path.join(meta_save_dir, "combined_test_features.npy"), combined_test_features)
-print(f"Đã lưu đặc trưng kết hợp tại {meta_save_dir}")
+print(f"Saved combined features at {meta_save_dir}")
