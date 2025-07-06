@@ -161,7 +161,7 @@ def load_ben_color(path, sigmaX=10, IMG_SIZE=244):
 - **Enhancement**: Highlights blood vessels and retinal lesions
 - **Resize**: Standardizes dimensions for model input
 
-### 3. Batch Processing
+### C. Batch Processing
 ```python
 processed_ids = []
 for idx, row in df_train.iterrows():
@@ -177,7 +177,7 @@ for idx, row in df_train.iterrows():
         print(f"Error {img_filename}: {e}")
 ```
 
-### 4. Data Splitting
+### D. Data Splitting
 ```python
 # Prepare data
 x = df_train_processed['id_code']
@@ -194,11 +194,20 @@ train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=
 ### Image Processing Techniques
 1. **Smart Cropping**: Keep only medically relevant regions
 2. **Contrast Enhancement**: Formula `4*original - 4*blurred + 128`
-3. **Standardization**: 244x244 pixels
+3. **Standardization**: 244x244 pixels but next step, we have resize image:299x299 (Xception and InceptionV3)
 
 ### Data Transformation
 - **Input**: Raw images with varying sizes and black borders
 - **Output**: 244x244 images with enhanced contrast, retina only
+
+
+| Original image (NO DIABETES) | Processed image (NO DIABETES) |
+|----------|-------------|
+| <img src="image/label0_original.png?raw=true" width="200"/> | <img src="image/label0_processed.png?raw=true" width="200"/> |
+
+| Original image (DIABETES) | Processed image (DIABETES)|
+|----------|-------------|
+| <img src="image/label4_original.png?raw=true" width="200"/> | <img src="image/label4_processed.png?raw=true" width="200"/> |
 
 
 ---
