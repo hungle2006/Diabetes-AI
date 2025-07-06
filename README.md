@@ -19,12 +19,12 @@
 
 ## 🎯 Introduction
 **What is Diabetic Retinopathy (DR) & the Urgency ?**
-    DR is a leading cause of preventable blindness worldwide.
-    DR is caused by diabetes damaging the retinal blood vessels.
-    Affects over 126 million people, with around 37 million at vision-threatening stages.
-    Early screening is critical, especially in low-resource settings.
-    Limited access to ophthalmic care in rural and low-income areas.
-    DR also imposes a huge economic burden
+    - DR is a leading cause of preventable blindness worldwide.
+    - DR is caused by diabetes damaging the retinal blood vessels.
+    - Affects over 126 million people, with around 37 million at vision-threatening stages.
+    - Early screening is critical, especially in low-resource settings.
+    - Limited access to ophthalmic care in rural and low-income areas.
+    - DR also imposes a huge economic burden
     
 This project develops an advanced AI system for diabetes detection and related complications through: 
 
