@@ -217,7 +217,7 @@ train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=
 
 
 
-## A. 📋 Overview
+## 📋 Overview
 
 This project implements a multi-model ensemble approach for diabetic retinopathy classification, utilizing advanced deep learning techniques including:
 - Multiple pre-trained CNN architectures
@@ -226,7 +226,7 @@ This project implements a multi-model ensemble approach for diabetic retinopathy
 - Grad-CAM visualization
 - Meta-learning feature extraction
 
-## B. 🎯 Key Features
+## 🎯 Key Features
 
 ### Multi-Model Architecture Support
 - **ResNet50**: Deep residual networks for robust feature extraction
@@ -622,24 +622,6 @@ def extract_features(model, generator, steps, model_type, save_path):
 - Original vs. augmented image comparisons
 - Class activation visualizations
 
-## 🛠️ Installation
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/diabetic-retinopathy-detection.git
-cd diabetic-retinopathy-detection
-
-# Install dependencies
-pip install tensorflow
-pip install albumentations
-pip install opencv-python
-pip install scikit-learn
-pip install matplotlib
-pip install seaborn
-```
-
-## 🚀 Usage
-
 ### Training
 ```python
 # Configure model
@@ -679,7 +661,7 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 ### Class Balancing Strategy
 - Analyzes initial class distribution
 - Generates synthetic samples for underrepresented classes
-- Implements targeted augmentation for class 3 (30% increase)
+- Implements targeted augmentation for class 3 (30% increase because between class 3 and class 4 is difficult to distinguish. In addition, class 3 accuracy is below 30)
 - Dynamic weight adjustment during training
 
 ### Quality Assurance
@@ -699,33 +681,6 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 - Best model saving based on QWK score
 - Multiple save formats (Keras, weights, JSON config)
 - Metadata tracking for reproducibility
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Pre-trained models from TensorFlow/Keras
-- Albumentations library for data augmentation
-- Medical imaging community for research insights
-- APTOS dataset for training data
-
-## 📞 Contact
-
-For questions or collaboration opportunities, please reach out through GitHub issues or email.
-
----
-
-**Note**: This implementation is designed for research and educational purposes. For clinical applications, please ensure proper validation and regulatory compliance.
 
 ---
 ## 🚀 Installation
