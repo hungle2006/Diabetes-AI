@@ -94,7 +94,7 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 <td width="33%">
 
 ### 📊 Risk Prediction
-- **Clinical Analysis**:age, bmi, genderglucose_apache, creatinine_apache, bun_apache,sodium_apache, albumin_apache
+- **Clinical Analysis**:age, bmi, gender, glucose_apache, creatinine_apache, bun_apache, sodium_apache, albumin_apache
 - **Ensemble Models**: Multiple ML algorithm
 - **Performance**: 86.43% accuracy
 
