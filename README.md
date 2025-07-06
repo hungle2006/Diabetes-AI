@@ -95,14 +95,14 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 
 ### 📊 Risk Prediction
 - **Clinical Analysis**:
-- age: "Patient's age (years). Input by user or predicted if missing.
-- bmi: "Body Mass Index (kg/m²). Input by user or predicted if missing.
-- gender: "Gender (Male/Female). Input by user or predicted if missing.
-- glucose_apache: "APACHE glucose score (mg/dL), assesses acute blood glucose levels. Input or predicted.
-- creatinine_apache: "APACHE creatinine score (mg/dL), assesses kidney function. Input or predicted.
-- bun_apache: "APACHE BUN score (mg/dL), assesses kidney function. Usually predicted.
-- sodium_apache: "APACHE sodium score (mEq/L), assesses electrolyte balance. Input or predicted.
-- albumin_apache: "APACHE albumin score (g/dL), assesses nutrition and liver function. Input or predicted.
+ age: "Patient's age (years). Input by user or predicted if missing.
+ bmi: "Body Mass Index (kg/m²). Input by user or predicted if missing.
+ gender: "Gender (Male/Female). Input by user or predicted if missing.
+ glucose_apache: "APACHE glucose score (mg/dL), assesses acute blood glucose levels. Input or predicted.
+ creatinine_apache: "APACHE creatinine score (mg/dL), assesses kidney function. Input or predicted.
+ bun_apache: "APACHE BUN score (mg/dL), assesses kidney function. Usually predicted.
+ sodium_apache: "APACHE sodium score (mEq/L), assesses electrolyte balance. Input or predicted.
+ albumin_apache: "APACHE albumin score (g/dL), assesses nutrition and liver function. Input or predicted.
 - **Ensemble Models**: Multiple ML algorithm
 - **Performance**: 86.43% accuracy
 
