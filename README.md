@@ -115,26 +115,9 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 
 ## 🏗️ System Architecture
 
-```
-📦 diabetes-detection-ai/
-├── 🧠 models/
-│   ├── retinopathy_model/     # CNN model for retinal images
-│   ├── clinical_model/        # ML model for clinical data
-│   └── ensemble_model/        # Combined model
-├── 📊 data/
-│   ├── fundus_images/         # Retinal image dataset
-│   ├── clinical_data/         # Clinical data
-│   └── preprocessed/          # Preprocessed data
-├── 🔧 src/
-│   ├── preprocessing/         # Data preprocessing
-│   ├── training/              # Training scripts
-│   ├── inference/             # Inference engine
-│   └── utils/                 # Utilities
-├── 🌐 web_app/                # Flask web application
-├── 🤖 discord_bot/            # Discord bot integration
-├── 📓 notebooks/              # Jupyter notebooks for analysis
-└── ⚙️ configs/                # Configuration files
-```
+<div align="center">
+<img src="System Architecture.png" alt="System Architecture" width="600">
+</div>
 
 ---
 
