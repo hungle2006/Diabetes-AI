@@ -683,6 +683,11 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 - Metadata tracking for reproducibility
 
 ### Training and test results
+
+<div align="center">
+<img src="image/traning_and_tesing_result.jpg" width="600">
+</div>
+
 ---
 ## 🚀 Installation
 
