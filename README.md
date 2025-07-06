@@ -119,7 +119,7 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 <img src="image/System_Architecture.jpg" alt="System Architecture" width="600">
 </div>
 
-## 1. Image Processing
+# 1. Image Processing
 
 <div align="center">
 <img src="image/process-image.jpg" alt="System Architecture" width="300">
@@ -213,7 +213,7 @@ train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=
 
 ---
 
-## 2. CNN-MODEL
+# 2. CNN-MODEL
 
 
 
@@ -692,7 +692,7 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 
 ---
 
-# Medical Image Classification Project with Meta-Learning (MAML/FOMAML)
+# 3. Medical Image Classification Project with Meta-Learning (MAML/FOMAML)
 
 ## Introduction
 
@@ -913,11 +913,6 @@ Additionally, ensure:
 - `gradcam_save_dir`: Directory for saving Grad-CAM heatmaps.
 
 ### Run the Code:
-
-Execute the main Python script:
-```bash
-python script.py
-```
 
 The code will automatically:
 - Load and preprocess data.
