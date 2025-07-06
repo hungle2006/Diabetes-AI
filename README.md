@@ -684,10 +684,11 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 
 ### Training and test results
 
-
 <div align="center">
 <img src="image/traning_and_tesing_result.jpg" width="600">
 </div>
+
+📥 [Tải file cnn_model.py](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/model/cnn_model.py)
 
 ---
 ## 🚀 Installation
