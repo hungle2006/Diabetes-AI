@@ -217,6 +217,476 @@ train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=
 
 
 
+## A. 📋 Overview
+
+This project implements a multi-model ensemble approach for diabetic retinopathy classification, utilizing advanced deep learning techniques including:
+- Multiple pre-trained CNN architectures
+- Dynamic data augmentation
+- Class balancing strategies
+- Grad-CAM visualization
+- Meta-learning feature extraction
+
+## B. 🎯 Key Features
+
+### Multi-Model Architecture Support
+- **ResNet50**: Deep residual networks for robust feature extraction
+- **EfficientNetB0**: Efficient scaling for optimal performance
+- **InceptionV3**: Multi-scale feature processing
+- **DenseNet121**: Dense connections for feature reuse
+- **Xception**: Depthwise separable convolutions
+
+### Advanced Training Techniques
+- **Dynamic Class Balancing**: Automatic adjustment of class weights during training
+- **Mixup Augmentation**: Advanced data augmentation for better generalization
+- **Rare Class Augmentation**: Targeted augmentation for underrepresented classes
+- **Progressive Learning**: Two-stage training with frozen and unfrozen layers
+
+### Intelligent Callbacks
+- **QWK Evaluation**: Quadratic Weighted Kappa scoring for medical accuracy
+- **Dynamic Learning Rate**: Adaptive learning rate based on QWK performance
+- **Early Stopping**: Prevention of overfitting with best weight restoration
+
+## 🏗️ Architecture
+
+### Data Generator (`My_Generator`)
+```python
+class My_Generator(tf.keras.utils.Sequence):
+    def __init__(self, image_filenames, labels, batch_size, is_train=False,
+                 mix=False, augment=False, size1=224, size2=299, model_type="default",
+                 balance_classes=False):
+        self.image_filenames = np.array(image_filenames)
+        self.labels = np.array(labels)
+        self.batch_size = batch_size
+        self.is_train = is_train
+        self.is_augment = augment
+        self.is_mix = mix
+        self.model_type = str(model_type).lower()
+        self.n_classes = self.labels.shape[1] if self.labels.ndim > 1 else int(max(self.labels) + 1)
+        if "inceptionv3" in self.model_type or "xception" in self.model_type:
+            self.target_size = (size2, size2)
+        else:
+            self.target_size = (size1, size1)
+        self.base_path = "/content/processed_train_images/"
+        if self.is_augment and self.is_train:
+            self.augmenter = A.Compose([
+                A.OneOf([
+                    A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0, p=1),
+                    A.MultiplicativeNoise(multiplier=(0.9, 1.1), per_channel=True, p=1),
+                    A.RandomBrightnessContrast(brightness_limit=0, contrast_limit=0.1, p=1)
+                ], p=0.5),
+                A.HorizontalFlip(p=0.5),
+                A.VerticalFlip(p=0.5),
+                A.CropAndPad(percent=(-0.1, 0), p=0.5)
+            ])
+        self.rare_augmenter = A.Compose([
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.7),
+            A.GaussNoise(p=0.5),
+            A.Rotate(limit=30, p=0.5),
+            A.RandomScale(scale_limit=0.2, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
+            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5)
+        ])
+        self.class_counts = self._compute_initial_class_counts()
+        self.augmented_class_counts = self.class_counts.copy()
+        self.class_weights = None
+        if self.is_train and balance_classes:
+            self.balance_class()
+        if self.is_train:
+            self.on_epoch_end()
+
+    def _compute_initial_class_counts(self):
+        labels = np.argmax(self.labels, axis=1) if self.labels.ndim > 1 else self.labels
+        return np.bincount(labels, minlength=self.n_classes)
+
+    def _compute_class_weights(self):
+        total_samples = np.sum(self.augmented_class_counts)
+        if total_samples == 0:
+            return np.ones(self.n_classes)
+        class_weights = total_samples / (self.n_classes * self.augmented_class_counts)
+        class_weights = np.where(np.isinf(class_weights) | (self.augmented_class_counts == 0), 1.0, class_weights)
+        return class_weights / np.min(class_weights[np.isfinite(class_weights)])
+
+    def get_class_weights(self):
+        """Return the current class weights for training."""
+        return self.class_weights
+
+    def balance_classes(self):
+        class_counts = self._compute_initial_class_counts()
+        max_count = class_counts[0]  # Use the number of samples in class 0 as the target
+
+        print(f"Initial sample counts: {class_counts}")
+        print(f"Target sample count per class (based on class 0): {max_count}")
+
+        new_filenames = []
+        new_labels = []
+        for cls in range(self.n_classes):
+            current_count = class_counts[cls]
+            if current_count == 0:
+                print(f"Class {cls} has no samples, skipping.")
+                continue
+            if cls == 3:
+                target_count = int(max_count * 1.3)  # Class 3 is increased by 30%
+            else:
+                target_count = max_count
+            if current_count < target_count:
+                samples_to_add = target_count - current_count
+                label_indices = np.argmax(self.labels, axis=1) if self.labels.ndim > 1 else self.labels
+                class_indices = np.where(label_indices == cls)[0]
+                for i in range(samples_to_add):
+                    idx = np.random.choice(class_indices)
+                    img_id = self.image_filenames[idx]
+                    label = self.labels[idx]
+                    img = self._load_image(img_id)
+                    if img is None:
+                        continue
+                    aug_img = self.rare_augmenter(image=img)['image']
+                    new_img_id = f"{img_id}_balance_aug_{i}"
+                    save_path = os.path.join(self.base_path, f"{new_img_id}.png")
+                    if cv2.imwrite(save_path, cv2.cvtColor(aug_img, cv2.COLOR_RGB2BGR)):
+                        new_filenames.append(new_img_id)
+                        new_labels.append(np.array(label, dtype=self.labels.dtype))
+                        self.augmented_class_counts[cls] += 1
+                    else:
+                        print(f"Error saving augmented image {new_img_id}")
+
+        if new_labels:
+            new_labels_array = np.array(new_labels)
+            if new_labels_array.ndim == 1:
+                new_labels_array = new_labels_array[:, np.newaxis]
+            self.image_filenames = np.concatenate([self.image_filenames, new_filenames])
+            self.labels = np.concatenate([self.labels, new_labels_array])
+
+        # Do not call on_epoch_end() here to avoid recalculating class weights immediately
+
+        # Check sample counts after balancing
+        updated_counts = self._compute_initial_class_counts()
+        print(f"Sample counts after balancing and augmenting class 3: {updated_counts}")
+
+    def augment_weak_classes(self, weak_classes, augment_factor=2):
+        new_filenames = []
+        new_labels = []
+        for idx, label in enumerate(self.labels):
+            label_class = np.argmax(label) if label.ndim > 1 else label
+            if np.isscalar(label_class) and np.isin(label_class, weak_classes):
+                img_id = self.image_filenames[idx]
+                img = self._load_image(img_id)
+                if img is None:
+                    continue
+                for i in range(augment_factor):
+                    aug_img = self.rare_augmenter(image=img)['image']
+                    new_img_id = f"{img_id}_weak_aug_{i}"
+                    save_path = os.path.join(self.base_path, f"{new_img_id}.png")
+                    if cv2.imwrite(save_path, cv2.cvtColor(aug_img, cv2.COLOR_RGB2BGR)):
+                        new_filenames.append(new_img_id)
+                        new_labels.append(np.array(label, dtype=self.labels.dtype))
+                        self.augmented_class_counts[label_class] += 1
+                    else:
+                        print(f"Error saving augmented image {new_img_id}")
+        if new_labels:
+            new_labels_array = np.array(new_labels)
+            if new_labels_array.ndim == 1:
+                new_labels_array = new_labels_array[:, np.newaxis]
+            self.image_filenames = np.concatenate([self.image_filenames, new_filenames])
+            self.labels = np.concatenate([self.labels, new_labels_array])
+
+    def __len__(self):
+        return int(np.ceil(len(self.image_filenames) / self.batch_size))
+
+    def __getitem__(self, idx):
+        batch_x = self.image_filenames[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_y = self.labels[idx * self.batch_size:(idx + 1) * self.batch_size]
+        return self._generate_batch(batch_x, batch_y, augment=self.is_train)
+
+    def on_epoch_end(self):
+        if self.is_train:
+            self.image_filenames, self.labels = shuffle(self.image_filenames, self.labels)
+            # Calculate class weights at the end of each epoch
+            self.class_weights = self._compute_class_weights()
+            print(f"Class weights after epoch: {self.class_weights}")
+            print(f"Augmented sample counts: {self.augmented_class_counts}")
+
+    def _load_image(self, img_id):
+        img_path = os.path.join(self.base_path, f"{img_id}.png")
+        try:
+            img = cv2.imread(img_path)
+            if img is None:
+                raise ValueError(f"Image not found or corrupted: {img_path}")
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(img, self.target_size)
+            return img
+        except Exception as e:
+            print(f"Error loading image {img_id}: {str(e)}")
+            return None
+
+    def _generate_batch(self, batch_x, batch_y, augment=False):
+        batch_images = []
+        valid_labels = []
+
+        for img_id, label in zip(batch_x, batch_y):
+            img = self._load_image(img_id)
+            if img is None:
+                continue
+            if augment and self.is_augment:
+                img = self.augmenter(image=img.astype(np.uint8))['image']
+            img = img.astype(np.float32) / 255.0
+
+            if "resnet50" in self.model_type:
+                img = resnet50_preprocess(img)
+            elif "efficientnetb0" in self.model_type:
+                img = efficientnet_preprocess(img)
+            elif "inceptionv3" in self.model_type:
+                img = inception_preprocess(img)
+            elif "densenet121" in self.model_type:
+                img = densenet_preprocess(img)
+            elif "xception" in self.model_type:
+                img = xception_preprocess(img)
+
+            batch_images.append(img)
+            valid_labels.append(label)
+
+        if not batch_images:
+            return np.zeros((1, *self.target_size, 3), dtype=np.float32), np.zeros((1, *batch_y.shape[1:]), dtype=np.float32)
+
+        batch_images = np.array(batch_images)
+        valid_labels = np.array(valid_labels)
+
+        if self.is_mix and len(batch_images) > 1:
+            batch_images, valid_labels = self._mixup(batch_images, valid_labels)
+
+        return batch_images, valid_labels
+
+    def _mixup(self, x, y):
+        lam = np.random.beta(0.2, 0.4)
+        index = np.random.permutation(len(x))
+        mixed_x = np.zeros_like(x)
+        mixed_y = np.zeros_like(y)
+        for i in range(len(x)):
+            if np.argmax(y[i]) == np.argmax(y[index[i]]):
+                mixed_x[i] = lam * x[i] + (1 - lam) * x[index[i]]
+                mixed_y[i] = y[i]
+            else:
+                mixed_x[i] = x[i]
+                mixed_y[i] = y[i]
+        return mixed_x, mixed_y
+```
+
+### Model Creation
+```python
+def create_model(input_shape, n_out, model_type, weights_path=None):
+    # Supports multiple architectures
+    # Custom classification head
+    # Flexible weight loading
+```
+
+## 📊 Performance Monitoring
+
+### Metrics Tracked
+- **Quadratic Weighted Kappa (QWK)**: Primary metric for medical classification
+- **F1-Score per Class**: Detailed performance analysis
+- **Sensitivity/Recall**: True positive rate per class
+- **Specificity**: True negative rate per class
+- **Precision**: Positive predictive value
+
+### Visualization Tools
+- **Grad-CAM**: Visual explanation of model decisions
+- **Confusion Matrix**: Detailed classification results
+- **Loss Curves**: Training progress monitoring
+
+## 🔧 Training Pipeline
+
+### Stage 1: Transfer Learning
+```python
+# Freeze base model layers
+for layer in model.layers[:50]:
+    layer.trainable = False
+
+# Train classification head
+model.compile(
+    loss=CategoricalCrossentropy(label_smoothing=0.1),
+    optimizer=Adam(learning_rate=1e-4),
+    metrics=['accuracy']
+)
+```
+
+### Stage 2: Fine-tuning
+```python
+# Unfreeze all layers
+for layer in model.layers:
+    layer.trainable = True
+
+# Fine-tune with mixup
+train_mixup = My_Generator(
+    is_train=True, 
+    mix=True, 
+    augment=True,
+    balance_classes=True
+)
+```
+
+## 🎨 Data Augmentation
+
+### Standard Augmentation
+- Random brightness/contrast adjustment
+- Horizontal and vertical flips
+- Multiplicative noise
+- Crop and pad operations
+
+### Rare Class Augmentation
+- Gaussian noise addition
+- Rotation and scaling
+- Hue/saturation/value shifts
+- Shift-scale-rotate transformations
+
+## 🧠 Meta-Learning Features
+
+### Feature Extraction
+```python
+def extract_features(model, generator, steps, model_type, save_path):
+    # Extracts both 2D and 4D features
+    # 2D: Global average pooled features
+    # 4D: Convolutional feature maps
+```
+
+### Multi-Scale Feature Fusion
+- Combines features from multiple model architectures
+- Reduces 4D features to 2D using global average pooling
+- Creates comprehensive feature representation
+
+## 📈 Results Analysis
+
+### Automatic Evaluation
+- Best model checkpointing based on QWK score
+- Comprehensive test set evaluation
+- Per-class performance metrics
+- Confusion matrix generation
+
+### Visual Interpretability
+- Grad-CAM heatmaps for model decision explanation
+- Original vs. augmented image comparisons
+- Class activation visualizations
+
+## 🛠️ Installation
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/diabetic-retinopathy-detection.git
+cd diabetic-retinopathy-detection
+
+# Install dependencies
+pip install tensorflow
+pip install albumentations
+pip install opencv-python
+pip install scikit-learn
+pip install matplotlib
+pip install seaborn
+```
+
+## 🚀 Usage
+
+### Training
+```python
+# Configure model
+model_configs = {
+    "densenet121": {
+        "model_type": "densenet121",
+        "weights_path": "path/to/weights.h5",
+        "save_path": "path/to/save/model.h5"
+    }
+}
+
+# Train model
+for model_name, config in model_configs.items():
+    model = create_model(
+        input_shape=(224, 224, 3),
+        n_out=NUM_CLASSES,
+        model_type=config["model_type"]
+    )
+    # ... training loop
+```
+
+### Evaluation
+```python
+# Evaluate on test set
+y_pred = model.predict(test_generator)
+qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
+```
+
+## 📁 Project Structure
+
+```
+diabetic-retinopathy-detection/
+├── models/
+│   ├── model_creation.py
+│   └── feature_extraction.py
+├── generators/
+│   └── data_generator.py
+├── callbacks/
+│   ├── qwk_evaluation.py
+│   ├── dynamic_augmentation.py
+│   └── loss_history.py
+├── utils/
+│   ├── gradcam.py
+│   └── preprocessing.py
+├── training/
+│   └── train_ensemble.py
+└── README.md
+```
+
+## 🔬 Technical Details
+
+### Class Balancing Strategy
+- Analyzes initial class distribution
+- Generates synthetic samples for underrepresented classes
+- Implements targeted augmentation for class 3 (30% increase)
+- Dynamic weight adjustment during training
+
+### Quality Assurance
+- Comprehensive error handling for image loading
+- Automatic validation of generated samples
+- Robust preprocessing pipeline
+- Memory-efficient batch processing
+
+## 📊 Model Performance
+
+### Evaluation Metrics
+- **Primary**: Quadratic Weighted Kappa (QWK)
+- **Secondary**: F1-Score, Sensitivity, Specificity, Precision
+- **Visualization**: Grad-CAM, Confusion Matrix
+
+### Checkpoint Management
+- Best model saving based on QWK score
+- Multiple save formats (Keras, weights, JSON config)
+- Metadata tracking for reproducibility
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Pre-trained models from TensorFlow/Keras
+- Albumentations library for data augmentation
+- Medical imaging community for research insights
+- APTOS dataset for training data
+
+## 📞 Contact
+
+For questions or collaboration opportunities, please reach out through GitHub issues or email.
+
+---
+
+**Note**: This implementation is designed for research and educational purposes. For clinical applications, please ensure proper validation and regulatory compliance.
+
 ---
 ## 🚀 Installation
 
