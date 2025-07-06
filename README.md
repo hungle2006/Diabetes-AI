@@ -671,7 +671,7 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 ## 📁 Project Structure
 
 <div align="center">
-<img src="image/Project_Structure.jpg" alt="Discord Chatbot Demo" width="400">
+<img src="image/Project_Structure.jpg" alt="Discord Chatbot Demo" width="600">
 </div>
 
 ## 🔬 Technical Details
