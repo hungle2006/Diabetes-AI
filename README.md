@@ -119,11 +119,87 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 <img src="image/System_Architecture.jpg" alt="System Architecture" width="600">
 </div>
 
-## Processing image
+## 1. Image Processing
 
 <div align="center">
 <img src="image/process-image.jpg" alt="System Architecture" width="300">
 </div>
+
+#### A. Smart Cropping
+```python
+def crop_image_from_gray_to_color(img, tol=7):
+    """Remove black borders around retinal images"""
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    mask = gray > tol
+    rows = mask.any(axis=1)
+    cols = mask.any(axis=0)
+    return img[np.ix_(rows, cols)]
+```
+
+#### B. Image Enhancement
+```python
+def load_ben_color(path, sigmaX=10, IMG_SIZE=244):
+    """Process images using Ben Graham's method"""
+    image = cv2.imread(path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Remove dark regions
+    image = crop_image_from_gray_to_color(image, tol=7)
+    
+    # Standardize size
+    image = cv2.resize(image, (IMG_SIZE, IMG_SIZE))
+    
+    # Enhance contrast
+    # Formula: 4*original - 4*blurred + 128
+    image = cv2.addWeighted(image, 4, cv2.GaussianBlur(image, (0, 0), sigmaX), -4, 128)
+    
+    return image
+```
+
+**Why is this important?**
+- **Cropping**: Removes black areas with no medical information
+- **Enhancement**: Highlights blood vessels and retinal lesions
+- **Resize**: Standardizes dimensions for model input
+
+### 3. Batch Processing
+```python
+processed_ids = []
+for idx, row in df_train.iterrows():
+    img_filename = f"{row['id_code']}.png"
+    img_path = os.path.join(train_img_folder, img_filename)
+    
+    try:
+        proc_img = load_ben_color(img_path, sigmaX=10, IMG_SIZE=244)
+        proc_img_bgr = cv2.cvtColor(proc_img, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(os.path.join(processed_folder, img_filename), proc_img_bgr)
+        processed_ids.append(row['id_code'])
+    except Exception as e:
+        print(f"Error {img_filename}: {e}")
+```
+
+### 4. Data Splitting
+```python
+# Prepare data
+x = df_train_processed['id_code']
+y = df_train_processed['diagnosis']
+x, y = shuffle(x, y, random_state=42)
+
+# Split Train(68%) - Val(12%) - Test(20%)
+x_temp, test_x, y_temp, test_y = train_test_split(x, y, test_size=0.20, stratify=y, random_state=42)
+train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=0.15/0.80, stratify=y_temp, random_state=42)
+```
+
+## 🔑 Key Points
+
+### Image Processing Techniques
+1. **Smart Cropping**: Keep only medically relevant regions
+2. **Contrast Enhancement**: Formula `4*original - 4*blurred + 128`
+3. **Standardization**: 244x244 pixels
+
+### Data Transformation
+- **Input**: Raw images with varying sizes and black borders
+- **Output**: 244x244 images with enhanced contrast, retina only
+
 
 ---
 
