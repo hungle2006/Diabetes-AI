@@ -209,6 +209,7 @@ train_x, valid_x, train_y, valid_y = train_test_split(x_temp, y_temp, test_size=
 |----------|-------------|
 | <img src="image/label4_original.png?raw=true" width="200"/> |    <img src="image/label4_processed.png?raw=true" width="200"/> |
 
+[📥 Tải mã xử lý ảnh tại đây](https://github.com/hungle2006/Diabetes-AI/raw/main/model/Processing_images.py)
 
 ---
 
