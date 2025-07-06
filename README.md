@@ -670,24 +670,9 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 
 ## 📁 Project Structure
 
-```
-diabetic-retinopathy-detection/
-├── models/
-│   ├── model_creation.py
-│   └── feature_extraction.py
-├── generators/
-│   └── data_generator.py
-├── callbacks/
-│   ├── qwk_evaluation.py
-│   ├── dynamic_augmentation.py
-│   └── loss_history.py
-├── utils/
-│   ├── gradcam.py
-│   └── preprocessing.py
-├── training/
-│   └── train_ensemble.py
-└── README.md
-```
+<div align="center">
+<img src="image/Project_Structure.jpg" alt="Discord Chatbot Demo" width="200">
+</div>
 
 ## 🔬 Technical Details
 
