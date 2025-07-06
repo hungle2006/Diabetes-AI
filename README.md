@@ -474,10 +474,34 @@ class My_Generator(tf.keras.utils.Sequence):
 
 ### Model Creation
 ```python
-def create_model(input_shape, n_out, model_type, weights_path=None):
-    # Supports multiple architectures
-    # Custom classification head
-    # Flexible weight loading
+def create_model(input_shape, n_out, model_type, weights_path=None, weights="imagenet"):
+    input_tensor = Input(shape=input_shape)
+    if model_type == "resnet50":
+        base_model = ResNet50(include_top=False, weights=weights if not weights_path else None, input_tensor=input_tensor)
+    elif model_type == "efficientnetb0":
+        base_model = EfficientNetB0(include_top=False, weights=weights if not weights_path else None, input_tensor=input_tensor)
+    elif model_type == "inceptionv3":
+        base_model = InceptionV3(include_top=False, weights=weights if not weights_path else None, input_tensor=input_tensor)
+    elif model_type == "densenet121":
+        base_model = DenseNet121(include_top=False, weights=weights if not weights_path else None, input_tensor=input_tensor)
+    elif model_type == "xception":
+        base_model = Xception(include_top=False, weights=weights if not weights_path else None, input_tensor=input_tensor)
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+    if weights_path:
+        try:
+            base_model.load_weights(weights_path)
+            print(f"Loaded weights from {weights_path}")
+        except Exception as e:
+            print(f"Error loading weights from {weights_path}: {e}")
+            raise
+    x = GlobalAveragePooling2D(name='global_avg_pool')(base_model.output)
+    x = Dropout(0.5)(x)
+    x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    final_output = Dense(n_out, activation="softmax", name='final_output')(x)
+    model = Model(input_tensor, final_output)
+    return model
 ```
 
 ## 📊 Performance Monitoring
@@ -544,9 +568,40 @@ train_mixup = My_Generator(
 ### Feature Extraction
 ```python
 def extract_features(model, generator, steps, model_type, save_path):
-    # Extracts both 2D and 4D features
-    # 2D: Global average pooled features
-    # 4D: Convolutional feature maps
+    """Extract 2D and 4D features from the model."""
+    # Get the name of the last convolutional layer
+    last_conv_layer_name = get_last_conv_layer(model, model_type)
+
+    # Create feature model
+    feature_model = Model(
+        inputs=model.input,
+        outputs=[
+            model.get_layer(last_conv_layer_name).output,  # 4D features
+            model.get_layer('global_avg_pool').output      # 2D features
+        ]
+    )
+
+    features_4d = []
+    features_2d = []
+    labels = []
+
+    # Extract features from generator
+    for i in range(steps):
+        batch_images, batch_labels = generator[i]
+        batch_features_4d, batch_features_2d = feature_model.predict(batch_images, verbose=0)
+        features_4d.append(batch_features_4d)
+        features_2d.append(batch_features_2d)
+        labels.append(batch_labels)
+
+    # Convert to NumPy arrays
+    features_4d = np.concatenate(features_4d, axis=0)
+    features_2d = np.concatenate(features_2d, axis=0)
+    labels = np.concatenate(labels, axis=0)
+
+    # Save features
+    np.savez(save_path, features_4d=features_4d, features_2d=features_2d, labels=labels)
+    print(f"Saved features at {save_path}: 4D shape {features_4d.shape}, 2D shape {features_2d.shape}")
+    return features_4d, features_2d, labels
 ```
 
 ### Multi-Scale Feature Fusion
