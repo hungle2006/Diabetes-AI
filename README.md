@@ -691,6 +691,266 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 📥 [Tải file cnn_model.py](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/model/cnn_model.py)
 
 ---
+
+# Medical Image Classification Project with Meta-Learning (MAML/FOMAML)
+
+## Introduction
+
+This project implements a medical image classification system using meta-learning techniques such as Model-Agnostic Meta-Learning (MAML) and First-Order MAML (FOMAML). The codebase focuses on processing image data, extracting features from pre-trained deep learning models like EfficientNet, Xception, InceptionV3, ResNet50, and DenseNet121, and applying meta-learning to improve classification performance on imbalanced datasets. The project also incorporates techniques like Grad-CAM for visualization and Focal Loss to handle minority classes.
+
+The project is designed to work with medical image datasets, such as retinal images for diagnosing diseases. The codebase includes data preprocessing, class balancing, feature extraction, and meta-learning model training with strategies like data augmentation and class balancing.
+
+## Key Features
+
+- **Data Preprocessing**: Load and process images from directories or compressed files, convert to RGB format, and resize images.
+- **Data Balancing**: Use techniques like oversampling and random erasing to address class imbalance.
+- **Feature Extraction**: Extract 2D and 4D features from pre-trained deep learning models (EfficientNetB0, Xception, InceptionV3, ResNet50, DenseNet121).
+- **Meta-Learning (MAML/FOMAML)**: Train meta-learning models with inner and outer loops, integrating Focal Loss to focus on minority classes.
+- **Grad-CAM Visualization**: Generate heatmaps to visualize important regions in images, aiding in interpreting model predictions.
+- **Performance Evaluation**: Use Quadratic Weighted Kappa (QWK), Precision, Recall, and F1-score to evaluate model performance.
+- **Storage and Management**: Save features, models, and evaluation metrics to .npy, .json, and .h5 files.
+
+## Code Structure
+
+Below are the main components of the codebase:
+
+### A. Data Loading and Preprocessing
+
+- `load_original_image(image_id, extract_dir)`: Load original images from an extracted directory based on image_id. Convert images to RGB and handle errors if images are not found.
+- `load_processed_image(image_id, processed_folder, size)`: Load preprocessed images, resize them, and convert to RGB.
+
+```python
+def load_original_image(image_id, extract_dir):
+    try:
+        image_id = image_id.replace('.png', '').replace('.jpg', '').replace('.jpeg', '')
+        for root, _, files in os.walk(extract_dir):
+            for file in files:
+                if file.lower().startswith(image_id.lower()) and file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    img_path = os.path.join(root, file)
+                    img = cv2.imread(img_path)
+                    if img is None:
+                        logging.error(f"Could not read image at: {img_path}")
+                        return None
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    return img
+        logging.warning(f"Image not found for ID: {image_id} in {extract_dir}")
+        return None
+    except Exception as e:
+        logging.error(f"Error loading original image {image_id}: {str(e)}")
+        return None
+```
+
+### B. Data Augmentation and Balancing
+
+- `custom_random_erasing(image, scale, ratio, p)`: Apply random erasing to augment image data, helping the model learn more robust features.
+- `balance_and_augment_data(images, labels, target_classes, samples_per_class)`: Balance the number of samples across classes using augmentation techniques like horizontal flipping, rotation, brightness adjustment, and Gaussian noise.
+
+```python
+def balance_and_augment_data(images, labels, target_classes=[0, 1, 2, 3, 4], samples_per_class=None):
+    num_classes = labels.shape[1]
+    label_indices = np.argmax(labels, axis=1)
+    keep_indices = np.isin(label_indices, target_classes)
+    filtered_images = images[keep_indices]
+    filtered_labels = labels[keep_indices]
+    filtered_label_indices = label_indices[keep_indices]
+    
+    class_counts = np.bincount(filtered_label_indices, minlength=num_classes)
+    print(f"Initial distribution: {dict(zip(range(num_classes), class_counts))}")
+    
+    max_count = samples_per_class or max(class_counts)
+    augmenter = A.Compose([
+        A.HorizontalFlip(p=0.5),
+        A.Rotate(limit=15, p=0.3),
+        A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.3),
+        A.GaussNoise(p=0.2),
+        A.CLAHE(clip_limit=1.0, tile_grid_size=(8, 8), p=0.2),
+    ])
+    
+    new_images, new_labels = [], []
+    for cls in target_classes:
+        cls_indices = np.where(filtered_label_indices == cls)[0]
+        cls_images = filtered_images[cls_indices]
+        cls_labels = filtered_labels[cls_indices]
+        current_count = len(cls_indices)
+        new_images.extend(cls_images)
+        new_labels.extend(cls_labels)
+        augment_count = max_count - current_count
+        if augment_count > 0:
+            for _ in range(augment_count):
+                idx = np.random.choice(cls_indices)
+                img = filtered_images[idx].astype(np.uint8)
+                aug_img = augmenter(image=img)['image']
+                aug_img = custom_random_erasing(aug_img, scale=(0.01, 0.05), ratio=(0.5, 2.0), p=0.3)
+                new_images.append(aug_img)
+                new_labels.append(filtered_labels[idx])
+    
+    new_images = np.array(new_images, dtype=np.float32)
+    new_labels = np.array(new_labels, dtype=np.float32)
+    return new_images, new_labels
+```
+
+### C. Feature Extraction
+
+- `extract_2d_features(model_name, config, generator, save_dir, sample_ids)`: Extract 2D features from deep learning models and save them to .npy files.
+- `load_4d_features(model_name, split)`: Load 4D features from .npz files and reduce them to 2D using averaging.
+- `combine_and_reduce_features(features_2d_dict, features_4d_dict, labels, sample_ids, save_dir, n_components)`: Combine 2D and 4D features, apply PCA for dimensionality reduction, and ensure synchronization between features and labels.
+
+### D. Meta-Learning (MAML/FOMAML)
+
+**maml_fomaml_train_manual**:
+- **Objective**: Train a meta-learning model with an inner loop to update weights on the support set and an outer loop to update the meta-model on the query set.
+- **Components**:
+  - Model: Uses custom layers like MemoryAugmentedLayer, GradientReversalLayer, and CustomGridDropout.
+  - Loss: Combines Focal Loss, domain loss, and prototypical loss.
+  - Optimization: Uses Adam optimizer with learning rate scheduling and early stopping.
+- **Output**: Meta-model, classification model, feature extraction model, and training history.
+
+```python
+def maml_fomaml_train_manual(
+    features, labels, valid_features, valid_labels, input_dim, n_episodes=50,
+    n_support=15, n_query=10, inner_lr=0.001, outer_lr=0.001, fine_tune_lr=0.0001,
+    use_fomaml=True, memory_size=20, sample_ids=None, images=None, features_4d_dict=None
+):
+    # Define model
+    def create_model(input_dim):
+        inputs = tf.keras.Input(shape=(input_dim,), dtype=tf.float32)
+        x = tf.keras.layers.Dense(256, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.1))(inputs)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = CustomGridDropout(ratio=0.3, holes_number=10, p=0.3)(x)
+        x = tf.keras.layers.Dropout(0.7)(x)
+        x = tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.1))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = CustomGridDropout(ratio=0.3, holes_number=5,  p=0.3)(x)
+        x = tf.keras.layers.Dropout(0.3)(x)
+        x = tf.keras.layers.Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.1))(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        feature_output = x
+        x = MemoryAugmentedLayer(memory_size=memory_size, memory_dim=64)(x)
+        classification_output = tf.keras.layers.Dense(NUM_CLASSES, activation='softmax', name='classification')(x)
+        domain_inputs = GradientReversalLayer(lambda_=1.0)(x)
+        domain_x = tf.keras.layers.Dense(32, activation='relu')(domain_inputs)
+        domain_output = tf.keras.layers.Dense(2, activation='softmax', name='domain')(domain_x)
+        model = tf.keras.Model(inputs=inputs, outputs=[classification_output, domain_output])
+        classification_model = tf.keras.Model(inputs=inputs, outputs=classification_output)
+        feature_model = tf.keras.Model(inputs=inputs, outputs=feature_output)
+        return model, classification_model, feature_model
+
+    meta_model, meta_classification_model, feature_model = create_model(input_dim)
+    # Continue with MAML/FOMAML training loop
+    # ...
+```
+
+### E. Grad-CAM Visualization
+
+- `compute_gradcam_4d(model, img_array, feature_4d, class_idx, layer_name, img_size)`: Compute and visualize Grad-CAM heatmaps to identify important regions in images contributing to model predictions.
+
+```python
+def compute_gradcam_4d(model, img_array, feature_4d, class_idx, layer_name, img_size=(224, 224)):
+    try:
+        img_array_resized = tf.image.resize(img_array, img_size, method=tf.image.ResizeMethod.BILINEAR)
+        img_array_resized = tf.ensure_shape(img_array_resized, [1, img_size[0], img_size[1], 3])
+        if hasattr(model, 'preprocess_input'):
+            img_array_resized = model.preprocess_input(img_array_resized)
+        grad_model = Model(
+            inputs=[model.input],
+            outputs=[model.get_layer(layer_name).output, model.output]
+        )
+        with tf.GradientTape() as tape:
+            conv_outputs, predictions = grad_model(img_array_resized)
+            loss = predictions[:, class_idx]
+        grads = tape.gradient(loss, conv_outputs)
+        if grads is None:
+            logging.error(f"Gradient is None for layer {layer_name}")
+            return None
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+        conv_outputs = conv_outputs[0]
+        heatmap = tf.reduce_sum(tf.multiply(pooled_grads, conv_outputs), axis=-1)
+        heatmap = tf.maximum(heatmap, 0)
+        heatmap_max = tf.reduce_max(heatmap)
+        heatmap = tf.where(
+            tf.math.logical_and(tf.math.is_finite(heatmap_max), heatmap_max > 0),
+            heatmap / heatmap_max,
+            tf.zeros_like(heatmap)
+        )
+        heatmap = heatmap.numpy()
+        heatmap = cv2.resize(heatmap, (img_array.shape[2], img_array.shape[1]))
+        heatmap = np.uint8(255 * np.clip(heatmap, 0, 1))
+        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        return heatmap
+    except Exception as e:
+        logging.error(f"Error in compute_gradcam_4d: {str(e)}")
+        return None
+```
+
+## Installation Requirements
+
+To run the codebase, install the following libraries:
+
+```bash
+pip install tensorflow numpy opencv-python scikit-learn albumentations pandas seaborn matplotlib sklearn
+```
+
+Additionally, ensure:
+
+- **TensorFlow**: Version 2.x.
+- **OpenCV**: For image processing.
+- **Albumentations**: For image data augmentation.
+- **Scikit-learn**: For PCA dimensionality reduction and metric evaluation.
+- **Seaborn and Matplotlib**: For visualization.
+
+## Usage Instructions
+
+### Prepare Data:
+
+- Place original images in the `extract_dir` directory.
+- Place preprocessed images in the `processed_folder` directory.
+- Ensure 4D feature files (.npz) are available.
+
+### Configure Directories:
+
+- `meta_save_dir`: Directory for saving 2D and 4D features.
+- `feature_save_dir`: Directory for saving model weights and metrics.
+- `gradcam_save_dir`: Directory for saving Grad-CAM heatmaps.
+
+### Run the Code:
+
+Execute the main Python script:
+```bash
+python script.py
+```
+
+The code will automatically:
+- Load and preprocess data.
+- Extract 2D and 4D features.
+- Train the meta-learning model.
+- Generate Grad-CAM heatmaps.
+- Save results and metrics.
+
+### Customize Parameters:
+
+- `NUM_CLASSES`: Number of classification classes (default is 5).
+- `n_episodes`: Number of meta-learning iterations (default is 20).
+- `n_support` and `n_query`: Number of support and query samples per class.
+- `inner_lr`, `outer_lr`, `fine_tune_lr`: Learning rates for the loops.
+
+## Output Results
+
+- **Features**: Saved as .npy files in `meta_save_dir`.
+- **Model Weights**: Saved as .h5 files in `feature_save_dir`.
+- **Grad-CAM Heatmaps**: Saved as .png files in `gradcam_save_dir`.
+- **Evaluation Metrics**: Saved as .json files, including QWK, Precision, Recall, and F1-score.
+- **Training History**: Training history plots saved as .png files.
+
+## Important Notes
+
+- **Handling NaN/Inf Errors**: The code includes checks and handling for NaN/Inf values in features and labels to ensure stability.
+- **Data Synchronization**: Ensure the number of samples in features, labels, and sample IDs are synchronized before training.
+- **Class Balancing**: Minority classes (e.g., classes 3 and 4) are weighted or oversampled to improve performance.
+- **Memory Management**: Use `gc.collect()` and `tf.keras.backend.clear_session()` to minimize memory usage.
+
+
+
+---
 ## 🚀 Installation
 
 ### 📋 System Requirements
