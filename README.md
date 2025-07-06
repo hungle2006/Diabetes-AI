@@ -122,7 +122,7 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 ## Processing image
 
 <div align="center">
-<img src="image/process-image.jpg" alt="System Architecture" width="600">
+<img src="image/process-image.jpg" alt="System Architecture" width="300">
 </div>
 
 ---
