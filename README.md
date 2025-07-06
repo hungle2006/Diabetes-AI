@@ -116,7 +116,7 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 ## 🏗️ System Architecture
 
 <div align="center">
-<img src="System Architecture.png" alt="System Architecture" width="600">
+<img src="System Architecture.jpg" alt="System Architecture" width="600">
 </div>
 
 ---
