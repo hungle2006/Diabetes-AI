@@ -30,8 +30,8 @@ This project develops an advanced AI system for diabetes detection and related c
 
 - **Retinal Image Analysis (Fundus Images)**: Detection of diabetic retinopathy
 - **Clinical Data Analysis**: Diabetes risk prediction based on medical indicators
-![Mô tả ảnh](image/label0_original.png)
-The system assists healthcare professionals in screening and early diagnosis, particularly valuable in regions with limited access to specialized ophthalmologists.And we combined on discord and built it into a chatbot
+The system assists healthcare professionals in screening and early diagnosis, particularly valuable in regions with limited access to specialized ophthalmologists.And we combined on discord and built it into a chatbot.
+-![Mô tả ảnh](image/chat-bot.gif)
 
 ## ✨ Features
 
