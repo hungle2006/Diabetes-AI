@@ -124,6 +124,7 @@ We've integrated our AI system into a **Discord chatbot** for easy access and re
 <div align="center">
 <img src="image/process-image.jpg" alt="System Architecture" width="600">
 </div>
+
 ---
 
 ## 🚀 Installation
