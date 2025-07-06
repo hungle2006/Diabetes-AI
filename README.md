@@ -682,6 +682,7 @@ qwk_score = cohen_kappa_score(y_true, y_pred, weights='quadratic')
 - Multiple save formats (Keras, weights, JSON config)
 - Metadata tracking for reproducibility
 
+### Training and test results
 ---
 ## 🚀 Installation
 
