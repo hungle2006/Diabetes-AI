@@ -959,6 +959,12 @@ def maml_fomaml_train_manual(
     # ...
 ```
 
+- **Domain Classifier**: is a branch in the model, designed to distinguish the domain of the data (for example, the data source is from hospital A or B), thereby helping the model learn general features (domain-invariant features). Combined with Gradient Reversal Layer (GRL) to reverse the gradient during training → the model will intentionally do poorly in discriminating domains → from there the learned features are "common" between domains.
+
+
+
+
+
 ### E. Grad-CAM Visualization
 
 - `compute_gradcam_4d(model, img_array, feature_4d, class_idx, layer_name, img_size)`: Compute and visualize Grad-CAM heatmaps to identify important regions in images contributing to model predictions.
