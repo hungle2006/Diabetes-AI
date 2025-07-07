@@ -1500,10 +1500,13 @@ This severity labeling system can be used for:
 - Missing data is handled gracefully by excluding those indicators from the calculation
 - The system is designed to be interpretable and clinically meaningful
 
----
-
-
 ## 🚀 Installation
+### 📦 Clinical data processing source code
+
+- [📥 Download `TrainingWiDS2021.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/TrainingWiDS2021.py)
+- [📥 Download `diabetes.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/diabetes.py)
+- [📥 Download `diabetes_prediction_dataset.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/diabetes_prediction_dataset.py)
+
 
 ### 📋 System Requirements
 <div align="center">
