@@ -1335,7 +1335,7 @@ The code will automatically:
 # 4. Clinical Data
 
 <p align="center">
-  <img src="![image](https://github.com/user-attachments/assets/99c3d98c-d404-43e5-9d2b-6fb2b88fe9cd)"
+  <img src="https://github.com/user-attachments/assets/99c3d98c-d404-43e5-9d2b-6fb2b88fe9cd" alt="image" />
 </p>
 
 
