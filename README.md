@@ -1507,6 +1507,7 @@ This severity labeling system can be used for:
 - [📥 Download `diabetes.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/diabetes.py)
 - [📥 Download `diabetes_prediction_dataset.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/diabetes_prediction_dataset.py)
 
+---
 
 ### 📋 System Requirements
 <div align="center">
