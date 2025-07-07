@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/273f16af-2ad9-42fd-81b4-32a9ccdc3042)# 🔬 AI Diabetes Detection System
+# 🔬 AI Diabetes Detection System
 ## AI-powered diabetes detection through retinal imaging and clinical data analysis
 
 <div align="center">
@@ -1219,6 +1219,10 @@ def compute_gradcam_4d(model, img_array, feature_4d, class_idx, layer_name, img_
 ```
 
 ## Training and test results
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/273f16af-2ad9-42fd-81b4-32a9ccdc3042" alt="image" width="600">
+</p>
 
 
 
