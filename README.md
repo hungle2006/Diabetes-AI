@@ -1330,9 +1330,13 @@ The code will automatically:
 
 📥 [Tải xuống meta_learning.py](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/model/meta_learning.py)
 
-
-
 ---
+
+# 4. Clinical Data
+## A. Create the label for data(0-4)
+### Why I do this?
+- In clinical data, there is no level 0-4 to match the image data to help easily distinguish which level the patient is at during examination.
+- Use GXBoost
 ## 🚀 Installation
 
 ### 📋 System Requirements
