@@ -1049,11 +1049,10 @@ def maml_fomaml_train_manual(
     - **Meta-task:**
       ```
       Meta-task:
-├── Support Set (n_way × k_shot)
-│   └── Used for quick training (inner loop)
-└── Query Set (n_way × q_query)
-    └── Used to evaluate and update the meta-model (outer loop)
-
+           ├── Support Set (n_way × k_shot)
+           │   └── Used for quick training (inner loop)
+           └── Query Set (n_way × q_query)
+           └── Used to evaluate and update the meta-model (outer loop)
       ```
         
 - **b. Inner-loop:**
