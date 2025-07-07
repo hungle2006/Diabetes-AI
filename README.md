@@ -1333,6 +1333,12 @@ The code will automatically:
 ---
 
 # 4. Clinical Data
+
+<p align="center">
+  <img src="![image](https://github.com/user-attachments/assets/99c3d98c-d404-43e5-9d2b-6fb2b88fe9cd)"
+</p>
+
+
 ## A. Create the label for data(0-4)
 ### Why I do this?
 - In clinical data, there is no level 0-4 to match the image data to help easily distinguish which level the patient is at during examination.
