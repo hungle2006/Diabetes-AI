@@ -797,8 +797,10 @@ def balance_and_augment_data(images, labels, target_classes=[0, 1, 2, 3, 4], sam
 
 ### D. Meta-Learning (MAML/FOMAML)
 
+---
+
 <div align="center">
-<img src="image/diagram.jpg" width="600">
+<img src="image/diagram.jpg" width="400">
 </div>
 
 ---
