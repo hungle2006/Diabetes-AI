@@ -1328,6 +1328,8 @@ The code will automatically:
 - **Class Balancing**: Minority classes (e.g., classes 3 and 4) are weighted or oversampled to improve performance.
 - **Memory Management**: Use `gc.collect()` and `tf.keras.backend.clear_session()` to minimize memory usage.
 
+📥 [Tải xuống meta_learning.py](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/model/meta_learning.py)
+
 
 
 ---
