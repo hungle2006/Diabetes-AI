@@ -1,4 +1,4 @@
-# 🔬 AI Diabetes Detection System
+![image](https://github.com/user-attachments/assets/273f16af-2ad9-42fd-81b4-32a9ccdc3042)# 🔬 AI Diabetes Detection System
 ## AI-powered diabetes detection through retinal imaging and clinical data analysis
 
 <div align="center">
@@ -1052,7 +1052,7 @@ def maml_fomaml_train_manual(
            ├── Support Set (n_way × k_shot)
            │   └── Used for quick training (inner loop)
            └── Query Set (n_way × q_query)
-           └── Used to evaluate and update the meta-model (outer loop)
+               └── Used to evaluate and update the meta-model (outer loop)
       ```
         
 - **b. Inner-loop:**
@@ -1217,6 +1217,10 @@ def compute_gradcam_4d(model, img_array, feature_4d, class_idx, layer_name, img_
         logging.error(f"Error in compute_gradcam_4d: {str(e)}")
         return None
 ```
+
+## Training and test results
+
+
 
 ## Installation Requirements
 
