@@ -962,8 +962,220 @@ def maml_fomaml_train_manual(
 - **Domain Classifier**: is a branch in the model, designed to distinguish the domain of the data (for example, the data source is from hospital A or B), thereby helping the model learn general features (domain-invariant features). Combined with Gradient Reversal Layer (GRL) to reverse the gradient during training → the model will intentionally do poorly in discriminating domains → from there the learned features are "common" between domains.
 
 
+<div align="center">
+<img src="image/bi_level.jpg" width="600">
+</div>
 
+- **Bi-Level Optimization Diagram:**
+   - **a. Sample a batch of tasks:**
+  
+  ```python
+  def sample_balanced_task(features, labels, n_support, n_query, n_way, min_required=2):
+    is_image_input = features.ndim == 4 and features.shape[-1] in [1, 3]  # Support RGB or grayscale
+    label_indices = tf.argmax(labels, axis=1).numpy()
+    unique_classes, counts = np.unique(label_indices, return_counts=True)
+    class_counts = dict(zip(unique_classes, counts))
 
+    # Adjust n_support/n_query if needed
+    while n_support + n_query >= min_required:
+        class_data = {cls: np.where(label_indices == cls)[0] for cls in unique_classes if class_counts[cls] >= min_required}
+        if len(class_data) >= min(n_way, len(unique_classes)):
+            break
+        if n_support > 1:
+            n_support -= 1
+        elif n_query > 1:
+            n_query -= 1
+        else:
+            break
+
+    if not class_data:
+        raise ValueError("Không có lớp nào đủ mẫu để tạo balanced task.")
+
+    # Select classes
+    eligible_classes = list(class_data.keys())
+    eligible_counts = np.array([class_counts[c] for c in eligible_classes])
+    class_probs = 1.0 / (eligible_counts + 1e-6)
+    class_probs /= class_probs.sum()
+    replace_classes = len(eligible_classes) < n_way
+    selected_classes = np.random.choice(eligible_classes, size=n_way, replace=replace_classes, p=class_probs)
+
+    task_features, task_labels = [], []
+
+    for cls in selected_classes:
+        cls_indices = class_data[cls]
+        total_needed = n_support + n_query
+        replace_sampling = len(cls_indices) < total_needed
+        selected = np.random.choice(cls_indices, size=total_needed, replace=replace_sampling)
+
+        feats = tf.gather(features, selected).numpy()
+        labs = tf.gather(labels, selected).numpy()
+
+        if is_image_input:
+            height, width = feats.shape[1:3]
+            augmenter = create_augmenter(height, width, is_image=True)
+            feats_aug = []
+            for feat in feats:
+                aug_img = augmenter(image=feat.astype(np.uint8))['image']
+                aug_img = custom_random_erasing(aug_img.astype(np.float32), is_image=True)
+                feats_aug.append(aug_img)
+            feats = np.stack(feats_aug, axis=0)
+        else:
+            augmenter = create_augmenter(is_image=False)
+            feats_aug = []
+            for feat in feats:
+                aug_feat = augmenter(feat.astype(np.float32))
+                aug_feat = custom_random_erasing(aug_feat, is_image=False)
+                feats_aug.append(aug_feat)
+            feats = np.stack(feats_aug, axis=0)
+
+        task_features.append(tf.convert_to_tensor(feats, dtype=tf.float32))
+        task_labels.append(tf.convert_to_tensor(labs, dtype=tf.float32))
+
+    features = tf.concat(task_features, axis=0)
+    labels = tf.concat(task_labels, axis=0)
+
+    if tf.math.reduce_any(tf.math.is_nan(labels)) or tf.math.reduce_any(tf.math.is_inf(labels)):
+        raise ValueError("Nhãn chứa NaN hoặc inf sau tăng cường")
+
+    return features, labels
+  ```
+  
+    - **Generate a task consisting of**:
+      - n_way randomly selected layers.
+      - Each layer has n_support samples for training and n_query samples for testing.
+      - Augmentation is applied to all samples.
+      - Can handle both images (4D) and feature vectors (2D).
+
+    - **Meta-task:**
+      ```
+      Meta-task:
+├── Support Set (n_way × k_shot)
+│   └── Used for quick training (inner loop)
+└── Query Set (n_way × q_query)
+    └── Used to evaluate and update the meta-model (outer loop)
+
+      ```
+        
+- **b. Inner-loop:**
+  
+  ```python
+  # Inner loop
+        for _ in range(15):
+            with tf.GradientTape() as tape:
+                class_preds, domain_preds = task_model(support_features, training=True)
+                if class_preds.shape[-1] != NUM_CLASSES:
+                    raise ValueError(f"class_preds shape không hợp lệ: {class_preds.shape}, mong đợi [batch_size, {NUM_CLASSES}]")
+                min_size = tf.minimum(tf.shape(class_preds)[0], tf.shape(support_labels)[0])
+                class_preds = class_preds[:min_size]
+                support_labels_adj = support_labels[:min_size]
+                min_size_domain = tf.minimum(tf.shape(domain_preds)[0], tf.shape(source_domain_labels)[0])
+                domain_preds = domain_preds[:min_size_domain]
+                source_domain_labels_slice = source_domain_labels[:min_size_domain]
+                support_labels_indices = tf.argmax(support_labels_adj, axis=1, output_type=tf.int32)
+                sample_weights = tf.gather(class_weights, support_labels_indices)
+                class_loss = loss_fn(support_labels_adj, class_preds, sample_weight=sample_weights)
+                domain_loss = domain_loss_fn(source_domain_labels_slice, domain_preds)
+                support_features_task = task_feature_model(support_features, training=False)
+                proto_loss = prototypical_loss(support_features_task, support_labels_adj, support_prototypes)
+                total_loss = class_loss + 0.5 * domain_loss + 0.5 * proto_loss
+            task_grads = tape.gradient(total_loss, task_model.trainable_variables)
+            valid_grads = [(g, v) for g, v in zip(task_grads, task_model.trainable_variables) if g is not None]
+            task_optimizer.apply_gradients(valid_grads)
+            task_keys = task_feature_model(support_features, training=False)
+            if task_keys.shape[1] != 128:
+                task_keys = tf.keras.layers.Dense(128, use_bias=False, dtype=tf.float32)(task_keys)
+            task_keys = tf.concat([task_keys, tf.zeros((memory_size - tf.shape(task_keys)[0], task_keys.shape[1]), dtype=tf.float32)], axis=0) if tf.shape(task_keys)[0] < memory_size else task_keys[:memory_size]
+            task_keys = task_feature_model(support_features, training=False)
+
+            if task_keys.shape[1] != 64:
+                projector = tf.keras.layers.Dense(64, use_bias=False, dtype=tf.float32)
+                task_keys = projector(task_keys)
+
+            task_keys = tf.concat(
+                [task_keys, tf.zeros((memory_size - tf.shape(task_keys)[0], 64), dtype=tf.float32)],
+                axis=0
+            ) if tf.shape(task_keys)[0] < memory_size else task_keys[:memory_size]
+
+            task_memory_layer.memory.assign(task_keys)
+
+            gc.collect()
+
+        support_preds, _ = task_model(support_features, training=False)
+        support_loss_value = float(loss_fn(support_labels_adj, support_preds).numpy())
+        support_accuracy = float(compute_accuracy(support_labels_adj, support_preds).numpy())
+  ```
+
+  **Purpose:**
+   - Fast optimization in specific tasks.
+   - Learn good initiation skills.
+   - Increase generalization to new tasks.
+   - Compatible with memory or domain classifier.
+ 
+
+- **c. Outer-loop:**
+  ```python
+  # Outer loop
+        with tf.GradientTape() as outer_tape:
+            query_preds, domain_preds = task_model(query_features, training=True)
+            min_size = tf.minimum(tf.shape(query_preds)[0], tf.shape(query_labels)[0])
+            query_preds = query_preds[:min_size]
+            query_labels_adj = query_labels[:min_size]
+            min_size_domain = tf.minimum(tf.shape(domain_preds)[0], tf.shape(source_domain_labels)[0])
+            domain_preds = domain_preds[:min_size_domain]
+            source_domain_labels_slice = source_domain_labels[:min_size_domain]
+            query_labels_indices = tf.argmax(query_labels_adj, axis=1, output_type=tf.int32)
+            sample_weights = tf.gather(class_weights, query_labels_indices)
+            query_loss = loss_fn(query_labels_adj, query_preds, sample_weight=sample_weights)
+            domain_loss = domain_loss_fn(source_domain_labels_slice, domain_preds)
+            query_features_task = task_feature_model(query_features, training=False)
+            proto_loss = prototypical_loss(query_features_task, query_labels_adj, support_prototypes)
+            total_query_loss = query_loss + 0.5 * domain_loss + 0.5 * proto_loss
+            query_accuracy = float(compute_accuracy(query_labels_adj, query_preds).numpy())
+            query_loss_value = float(query_loss.numpy())
+
+        meta_grads = outer_tape.gradient(total_query_loss, task_model.trainable_variables)
+        valid_grads = [(g, v) for g, v in zip(meta_grads, meta_model.trainable_variables) if g is not None]
+        meta_optimizer.apply_gradients(valid_grads)
+        memory_keys = feature_model(support_features, training=False)
+        if memory_keys.shape[1] != 128:
+            memory_keys = tf.keras.layers.Dense(128, use_bias=False, dtype=tf.float32)(memory_keys)
+        memory_keys = tf.concat([memory_keys, tf.zeros((memory_size - tf.shape(memory_keys)[0], memory_keys.shape[1]), dtype=tf.float32)], axis=0) if tf.shape(memory_keys)[0] < memory_size else memory_keys[:memory_size]
+        memory_keys = feature_model(support_features, training=False)
+
+        # Sửa: Nếu memory_keys.shape[1] != 64 thì project về 64
+        if memory_keys.shape[1] != 64:
+            projector = tf.keras.layers.Dense(64, use_bias=False, dtype=tf.float32)
+            memory_keys = projector(memory_keys)
+
+        # Đảm bảo kích thước đúng
+        memory_keys = tf.concat(
+            [memory_keys, tf.zeros((memory_size - tf.shape(memory_keys)[0], 64), dtype=tf.float32)],
+            axis=0
+        ) if tf.shape(memory_keys)[0] < memory_size else memory_keys[:memory_size]
+
+        memory_layer.memory.assign(memory_keys)
+
+        gc.collect()
+
+        # Fine-tune
+        for _ in range(5):
+            with tf.GradientTape() as fine_tune_tape:
+                fine_tune_preds = meta_classification_model(query_features, training=True)
+                min_size = tf.minimum(tf.shape(fine_tune_preds)[0], tf.shape(query_labels)[0])
+                if min_size == 0:
+                    continue
+                fine_tune_preds = fine_tune_preds[:min_size]
+                query_labels_adj = query_labels[:min_size]
+                query_labels_indices = tf.argmax(query_labels_adj, axis=1, output_type=tf.int32)
+                sample_weights = tf.gather(class_weights, query_labels_indices)
+                fine_tune_loss = loss_fn(query_labels_adj, fine_tune_preds, sample_weight=sample_weights)
+            fine_tune_grads = fine_tune_tape.gradient(fine_tune_loss, meta_classification_model.trainable_variables)
+            valid_grads = [(g, v) for g, v in zip(fine_tune_grads, meta_classification_model.trainable_variables) if g is not None]
+            fine_tune_optimizer.apply_gradients(valid_grads)
+            gc.collect()
+  ```
+
+  **Purpose:** Outer loop = where meta-learning happens. Here, the model learns to optimize the inner loop so that it can generalize best across the query set.
 
 ### E. Grad-CAM Visualization
 
