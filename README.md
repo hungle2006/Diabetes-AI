@@ -1343,6 +1343,166 @@ The code will automatically:
 ### Why I do this?
 - In clinical data, there is no level 0-4 to match the image data to help easily distinguish which level the patient is at during examination.
 - Use GXBoost
+
+# 📊 ICU Severity Labeling (Weighted Voting Approach)
+
+This project implements **severity labeling for ICU patients** by combining multiple clinical criteria through a **weighted voting approach**.
+
+## 🎯 Objective
+
+Build a **severity classification label** (`severity_label`) for each ICU patient from raw data. This label is calculated based on vital signs, blood tests, ventilator parameters, and patient consciousness levels.
+
+## 🧠 Labeling Method: Weighted Voting
+
+### ✅ Severity Levels (Labels):
+- `0`: **STABLE**
+- `1`: **MILD**
+- `2`: **MODERATE**
+- `3`: **SEVERE**
+- `4`: **CRITICAL**
+
+### 🧪 Clinical Criteria Used:
+
+| LF Name | Description | Weight |
+|---------|-------------|--------|
+| `gcs_lf` | Glasgow Coma Scale total score (consciousness) | 0.35 |
+| `map_lf` | Mean Arterial Pressure (MAP) | 0.20 |
+| `ventilation_lf` | Ventilation status or intubation | 0.20 |
+| `kidney_lf` | Kidney function (BUN, Creatinine, and ARF) | 0.10 |
+| `abg_lf` | Arterial blood gas analysis (pH, PaO2/FiO2) | 0.10 |
+| `lactate_lf` | Lactate concentration | 0.05 |
+
+📌 **Note**: If an indicator is missing, the corresponding LF will not be included in the vote.
+
+## ⚙️ How It Works
+
+1. For each patient, each labeling function (LF) returns a label (0 → 4), or `-1` if data is missing.
+2. Calculate the weighted average score from valid labels.
+3. Round the score to get the final `severity_label`.
+
+## 🧾 Example
+
+Suppose a patient has the following assessments:
+- `gcs_lf = 4` (CRITICAL)
+- `map_lf = 2` (MODERATE)
+- `ventilation_lf = 3` (SEVERE)
+- `kidney_lf = -1` (missing data)
+- `abg_lf = 1` (MILD)
+- `lactate_lf = 0` (STABLE)
+
+**Weighted Score Calculation:**
+```
+score = (4×0.35 + 2×0.2 + 3×0.2 + 1×0.1 + 0×0.05) / (0.35 + 0.2 + 0.2 + 0.1 + 0.05) 
+      = (1.4 + 0.4 + 0.6 + 0.1 + 0) / 0.9
+      = 2.5 / 0.9 
+      ≈ 2.78 → rounded → 3 (SEVERE)
+```
+
+## 🧩 Main Function for Label Creation
+
+```python
+def create_labels(data):
+    """
+    Create severity labels for ICU patients using weighted voting approach.
+    
+    Parameters:
+    -----------
+    data : pandas.DataFrame
+        Input data containing patient information
+        
+    Returns:
+    --------
+    list : List of severity labels (0-4) for each patient
+    """
+    labels = []
+    weights = {
+        'gcs': 0.35,
+        'map': 0.20,
+        'ventilation': 0.20,
+        'kidney': 0.10,
+        'abg': 0.10,
+        'lactate': 0.05
+    }
+    
+    for _, row in data.iterrows():
+        # Get scores from all labeling functions
+        lf_scores = [
+            gcs_lf(row),
+            map_lf(row),
+            ventilation_lf(row),
+            kidney_lf(row),
+            abg_lf(row),
+            lactate_lf(row)
+        ]
+        
+        # Filter out missing values (-1)
+        valid_scores = [s for s in lf_scores if s != -1]
+        
+        # Handle case where all scores are missing
+        if not valid_scores:
+            labels.append(np.nan)
+            continue
+        
+        # Calculate weighted score
+        weighted_score = 0
+        total_weight = 0
+        
+        weight_keys = ['gcs', 'map', 'ventilation', 'kidney', 'abg', 'lactate']
+        for i, score in enumerate(lf_scores):
+            if score != -1:
+                weighted_score += score * weights[weight_keys[i]]
+                total_weight += weights[weight_keys[i]]
+        
+        # Final label
+        final_score = weighted_score / total_weight
+        labels.append(round(final_score))
+    
+    return labels
+```
+
+## 📋 Usage
+
+```python
+# Load your ICU patient data
+data = pd.read_csv('icu_patient_data.csv')
+
+# Create severity labels
+severity_labels = create_labels(data)
+
+# Add labels to dataframe
+data['severity_label'] = severity_labels
+
+# Display label distribution
+print(data['severity_label'].value_counts().sort_index())
+```
+
+## 📈 Output
+
+The function returns severity labels with the following distribution:
+- **0 (STABLE)**: Patients with minimal risk
+- **1 (MILD)**: Patients with low severity
+- **2 (MODERATE)**: Patients requiring moderate intervention
+- **3 (SEVERE)**: Patients in serious condition
+- **4 (CRITICAL)**: Patients requiring immediate intensive care
+
+## 🎯 Applications
+
+This severity labeling system can be used for:
+- Risk stratification in ICU
+- Resource allocation planning
+- Clinical decision support
+- Research and quality improvement initiatives
+- Predictive modeling for patient outcomes
+
+## 📝 Notes
+
+- The weighted voting approach ensures that the most clinically significant indicators (like GCS) have greater influence on the final severity assessment
+- Missing data is handled gracefully by excluding those indicators from the calculation
+- The system is designed to be interpretable and clinically meaningful
+
+---
+
+
 ## 🚀 Installation
 
 ### 📋 System Requirements
