@@ -712,11 +712,6 @@ The project is designed to work with medical image datasets, such as retinal ima
 
 ## Code Structure
 
-<div align="center">
-<img src="image/diagram.jpg" width="600">
-</div>
-
-
 Below are the main components of the codebase:
 
 ### A. Data Loading and Preprocessing
@@ -801,6 +796,12 @@ def balance_and_augment_data(images, labels, target_classes=[0, 1, 2, 3, 4], sam
 - `combine_and_reduce_features(features_2d_dict, features_4d_dict, labels, sample_ids, save_dir, n_components)`: Combine 2D and 4D features, apply PCA for dimensionality reduction, and ensure synchronization between features and labels.
 
 ### D. Meta-Learning (MAML/FOMAML)
+
+<div align="center">
+<img src="image/diagram.jpg" width="600">
+</div>
+
+---
 
 **maml_fomaml_train_manual**:
 - **Objective**: Train a meta-learning model with an inner loop to update weights on the support set and an outer loop to update the meta-model on the query set.
