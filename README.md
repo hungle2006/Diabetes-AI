@@ -797,18 +797,129 @@ def balance_and_augment_data(images, labels, target_classes=[0, 1, 2, 3, 4], sam
 
 ### D. Meta-Learning (MAML/FOMAML)
 
----
 
 <div align="center">
 <img src="image/diagram.jpg" width="400">
 </div>
 
----
 
 **maml_fomaml_train_manual**:
 - **Objective**: Train a meta-learning model with an inner loop to update weights on the support set and an outer loop to update the meta-model on the query set.
 - **Components**:
   - Model: Uses custom layers like MemoryAugmentedLayer, GradientReversalLayer, and CustomGridDropout.
+  - **MemoryAugmentedLayer**: Memorize and reuse features from encountered patterns, Improve generalization across episodes with limited number of patterns.
+ 
+    ```python
+    class MemoryAugmentedLayer(tf.keras.layers.Layer):
+          def __init__(self, memory_size, memory_dim, **kwargs):
+              super().__init__(**kwargs)
+              self.memory_size = memory_size
+              self.memory_dim = memory_dim
+              self.memory_projection = None  # Chuyển Dense vào đây
+
+          def build(self, input_shape):
+              self.input_dim = input_shape[-1]
+
+              self.memory = self.add_weight(
+                  shape=(self.memory_size, self.memory_dim),
+                  initializer='zeros',
+                  trainable=False,
+                  name='memory',
+                  dtype=tf.float32
+              )
+
+              if self.memory_dim != self.input_dim:
+                  self.memory_projection = tf.keras.layers.Dense(self.input_dim, use_bias=False, name="memory_projection")
+
+              super().build(input_shape)
+
+          def call(self, inputs):
+              if len(inputs.shape) != 2:
+                  logging.warning(f"Đầu vào MemoryAugmentedLayer không phải 2D: {inputs.shape}, reshape về 2D")
+                  inputs = tf.reshape(inputs, [-1, inputs.shape[-1]])
+
+              batch_size = tf.shape(inputs)[0]
+              memory_size = tf.shape(self.memory)[0]
+
+              memory_sliced = tf.cond(
+                  tf.greater(batch_size, memory_size),
+                  lambda: tf.tile(self.memory, [(batch_size + memory_size - 1) // memory_size, 1])[:batch_size],
+                  lambda: self.memory[:batch_size]
+              )
+
+              if self.memory_projection is not None:
+                  memory_sliced = self.memory_projection(memory_sliced)
+
+              stacked = tf.stack([inputs, memory_sliced], axis=0)
+              output = tf.reduce_mean(stacked, axis=0)
+              return output
+
+          def compute_output_shape(self, input_shape):
+              return (input_shape[0], input_shape[-1])
+
+          def get_config(self):
+              config = super().get_config()
+              config.update({
+                  'memory_size': self.memory_size,
+                  'memory_dim': self.memory_dim,
+              })
+              return config
+    ```
+  - **GradientReversalLayer**:
+    - Main direction: Give the taxonomic branch a good feature (class discrimination).
+    - Reverse direction: Give the domain discrimination branch a good feature discrimination so that it cannot discriminate the domain → the feature will be invariant with the domain.
+      
+    ```python
+    class GradientReversalLayer(tf.keras.layers.Layer):
+    def __init__(self, lambda_=1.0, **kwargs):
+        super().__init__(**kwargs)
+        self.lambda_ = lambda_
+
+    def call(self, inputs):
+        return tf.keras.backend.stop_gradient(inputs) * (-self.lambda_)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({'lambda_': self.lambda_})
+        return config
+    ```
+
+  - **CustomGridDropout**: is a custom layer commonly used to reduce overfitting by masking small grid-like regions in the input feature. Unlike regular Dropout (which randomly drops elements), GridDropout masks continuous regions – often used for images or spatial features.
+
+
+    ```python
+    class CustomGridDropout(tf.keras.layers.Layer):
+    def __init__(self, ratio, holes_number, p, **kwargs):
+        super().__init__(**kwargs)
+        self.ratio = ratio
+        self.holes_number = holes_number
+        self.p = p
+
+    def call(self, inputs, training=None):
+        if not training:
+            return inputs
+
+        batch_size = tf.shape(inputs)[0]
+        feature_dim = tf.shape(inputs)[1]
+
+        # Example dropout logic (simplified)
+        mask = tf.random.uniform([batch_size, feature_dim]) > self.p
+        mask = tf.cast(mask, tf.float32)
+        return inputs * mask / (1 - self.p)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({'ratio': self.ratio, 'holes_number': self.holes_number, 'p': self.p})
+        return config
+    ```
+
+    
   - Loss: Combines Focal Loss, domain loss, and prototypical loss.
   - Optimization: Uses Adam optimizer with learning rate scheduling and early stopping.
 - **Output**: Meta-model, classification model, feature extraction model, and training history.
