@@ -712,6 +712,11 @@ The project is designed to work with medical image datasets, such as retinal ima
 
 ## Code Structure
 
+<div align="center">
+<img src="image/diagram.jpg" width="600">
+</div>
+
+
 Below are the main components of the codebase:
 
 ### A. Data Loading and Preprocessing
