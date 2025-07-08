@@ -1508,6 +1508,195 @@ This severity labeling system can be used for:
 - [📥 Download `diabetes_prediction_dataset.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/diabetes_prediction_dataset.py)
 
 ---
+## B. Diabetes-AI: Clinical Data Meta-Learning and Fine-Tuning Pipeline
+
+## 📌 Overview
+
+This repository implements a robust pipeline for training, evaluating, and fine-tuning a deep learning model on clinical data, focusing on multi-class classification (5 severity levels). It integrates advanced techniques including feature engineering, Focal Loss, ensemble learning, SMOTE balancing, and model fine-tuning across small related datasets. The system is modular and designed for scalability, generalization, and improved robustness in imbalanced healthcare prediction problems.
+
+---
+
+## 🔧 Core Components
+
+### 1. `AdvancedMLP` Architecture
+
+A custom multi-layer perceptron with:
+
+* Two configurable hidden layers
+* Batch Normalization
+* ReLU activations
+* Dropout regularization (configurable rate)
+* Final linear classifier for 5-class output
+
+```python
+class AdvancedMLP(nn.Module):
+    def __init__(self, input_size, hidden_sizes, num_classes, dropout_rate=0.3):
+        # ... defines layers with BN + ReLU + Dropout
+```
+
+### 2. `FocalLoss` for Imbalanced Data
+
+To handle severe class imbalance, the training uses a variant of Focal Loss that dynamically adjusts its `alpha` parameter during validation based on confusion matrix analysis:
+
+```python
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None):
+        # Alpha can be set or adapted
+```
+
+---
+
+## 🧪 Data Preprocessing
+
+### `preprocess_clinical_data()`
+
+Prepares datasets for training:
+
+* Handles numeric and categorical columns
+* Applies SMOTE (optional)
+* Uses `RobustScaler` and `OneHotEncoder`
+* Selects top-K features via `SelectKBest`
+* Ensures output feature dimension alignment between datasets
+
+For small datasets:
+
+* Aligns columns with the large dataset
+* Adds synthetic class-4 examples to improve representation
+
+---
+
+## 🏋️‍♀️ Training Strategy
+
+### 1. Large Dataset Training
+
+* Performs 3-fold cross-validation
+* Uses Optuna to optimize:
+
+  * Learning rate
+  * Hidden layer sizes
+  * Dropout rate
+* Saves model checkpoints and best QWK (Quadratic Weighted Kappa)
+
+```python
+train_model(..., checkpoint_path='main_checkpoint_fold1.pth')
+```
+
+### 2. Dynamic Class Weighting
+
+Each epoch:
+
+* Evaluates confusion matrix on validation set
+* Recalculates class weights from per-class recall
+* Scales Focal Loss `alpha` accordingly
+
+```python
+recalls = ...
+class_weights = [1 / max(r, 0.01) for r in recalls]
+focal_loss.alpha = class_weights * initial_alpha
+```
+
+---
+
+## 🔁 Fine-Tuning on Small Datasets
+
+### `fine_tune_multiple_small_datasets()`
+
+* Preprocesses each small dataset
+* Aligns features with large dataset
+* Applies SMOTE
+* Fine-tunes pretrained model with 3-fold CV
+* Saves fold-wise fine-tuned checkpoints
+
+```python
+models = fine_tune_model(...)
+```
+
+---
+
+## 📊 Evaluation
+
+### `evaluate_model()`
+
+* Combines predictions from model ensemble via weighted voting
+* Weights based on overall accuracy + class 0/1 sensitivity
+* Computes:
+
+  * Accuracy
+  * QWK
+  * Precision, Recall, F1 per class
+  * Confusion Matrix (plotted and saved)
+* Saves detailed performance logs to CSV
+
+```python
+ensemble_preds, metrics = evaluate_model(...)
+```
+
+---
+
+## 📁 File Structure
+
+```
+├── meta_learning.py           # Main training, tuning, and evaluation pipeline
+├── clinical-data/
+│   ├── process-data/
+│   │   ├── TrainingWiDS2021.csv
+│   │   ├── diabetes_filled.csv
+│   │   ├── diabetes_prediction_dataset_filled.csv
+├── drive/
+│   ├── *.pth                  # Saved model checkpoints
+│   ├── *.npy                  # Saved test sets
+│   ├── evaluation_metrics.csv
+│   ├── *.png                  # Plots of confusion matrices & F1 bars
+```
+
+---
+
+## 🧠 Advanced Features
+
+* **Checkpointing**: Saves models per fold and auto-resumes from latest checkpoint if training interrupted.
+* **Auto Feature Padding**: Ensures consistent input size across datasets.
+* **Per-Dataset Fine-Tuning**: Enables model transferability.
+* **Metric Logging**: Each test evaluation is logged to CSV for later review.
+
+---
+
+## 🚀 How to Run
+
+1. Mount Google Drive (for saving/loading models):
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+2. Run the main script:
+
+```bash
+python meta_learning.py
+```
+
+3. Monitor saved checkpoints and evaluation results in `/content/drive/MyDrive/`
+
+---
+
+## 📈 Sample Outputs
+
+* `confusion_matrix_test_large_dataset_main_models.png`
+* `f1_score_per_class_test_small_dataset_1_fine_tuned_models.png`
+* `evaluation_metrics.csv`
+
+---
+
+## 🔖 References
+
+* [Optuna for hyperparameter optimization](https://optuna.org/)
+* [Focal Loss paper](https://arxiv.org/abs/1708.02002)
+* [Quadratic Weighted Kappa](https://www.kaggle.com/competitions/diabetic-retinopathy-detection/discussion/15801)
+
+---
+
+> Made with ❤️ for medical AI research
+
 
 ### 📋 System Requirements
 <div align="center">
