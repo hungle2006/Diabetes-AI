@@ -1695,7 +1695,7 @@ python meta_learning.py
 
 ---
 
-> Made with ❤️ for medical AI research
+>[📥 Download `TrainingWiDS2021.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/clinical_model.py)
 
 
 ### 📋 System Requirements
