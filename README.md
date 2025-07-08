@@ -1930,12 +1930,12 @@ graph TD
 ## 🚀 Installation
 ### You can test discord bot if you download this files and don't tranning meta-learning and clinical model:
 
-| Tên File                                         | Mô Tả                          | Link                                                                                                                    |
+| Name File                                        | Describe                       | Link                                                                                                                    |
 | ------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `config.json`                                    | Cấu hình mô hình               | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/config.json)                                    |
-| `main_clinical_model.pth`                        | Trọng số mô hình chính         | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/main_clinical_model.pth)                        |
-| `meta_model_maml_fomaml_best_weights.weights.h5` | Trọng số mô hình meta-learning | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/meta_model_maml_fomaml_best_weights.weights.h5) |
-| `chat-bot.py`                                    | Bot trò chuyện AI              | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/chat-bot.py)                                             |
+| `config.json`                                    | Model configuration            | [Download](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/config.json)                                     |
+| `main_clinical_model.pth`                        | Main model weights             | [Download](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/main_clinical_model.pth)                         |
+| `meta_model_maml_fomaml_best_weights.weights.h5` | Meta-learning model weights    | [Download](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/meta_model_maml_fomaml_best_weights.weights.h5)  |
+| `chat-bot.py`                                    | AI Chat Bot                    | [Download](https://github.com/hungle2006/Diabetes-AI/raw/main/chat-bot.py)                                              |
 
 
 
@@ -2051,147 +2051,11 @@ python scripts/clinical_batch.py --input_file data/patients.csv --output_file re
 
 ---
 
-## 📊 Results
 
-<div align="center">
-
-### 🎯 Model Performance
-
-</div>
-
-<table>
-<tr>
-<td width="50%">
-
-#### 👁️ Retinopathy Model
-| Metric | Score |
-|--------|-------|
-| Accuracy | **94.2%** |
-| Precision | **93.8%** |
-| Recall | **94.1%** |
-| F1-Score | **93.9%** |
-| AUC | **0.98** |
-
-</td>
-<td width="50%">
-
-#### 🏥 Clinical Model
-| Metric | Score |
-|--------|-------|
-| Accuracy | **91.8%** |
-| Precision | **90.2%** |
-| Recall | **92.1%** |
-| F1-Score | **91.1%** |
-| AUC | **0.96** |
-
-</td>
-</tr>
-</table>
-
-### 📈 Visualizations
-<div align="center">
-<img src="images/confusion_matrix.png" alt="Confusion Matrix" width="400">
-<img src="images/roc_curves.png" alt="ROC Curves" width="400">
-</div>
-
----
-
-## 🔧 Configuration
-
-Customize your setup by editing `configs/config.yaml`:
-
-```yaml
-model:
-  retinopathy:
-    backbone: "efficientnet-b4"
-    input_size: 512
-    num_classes: 5
-  clinical:
-    algorithm: "xgboost"
-    features: 15
-    
-training:
-  batch_size: 32
-  learning_rate: 0.001
-  epochs: 100
-  
-discord_bot:
-  token: "your_bot_token"
-  prefix: "!"
-```
-
----
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Test with coverage
-python -m pytest --cov=src tests/
-
-# Integration tests
-python tests/integration/test_pipeline.py
-```
-
----
-
-## 🤝 Contributing
-
-<div align="center">
-<img src="https://contrib.rocks/image?repo=yourusername/diabetes-detection-ai" alt="Contributors">
-</div>
-
-We welcome contributions! Here's how to get started:
-
-1. **🍴 Fork** the repository
-2. **🌿 Create** your feature branch (`git checkout -b feature/amazing-feature`)
-3. **💾 Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **🚀 Push** to the branch (`git push origin feature/amazing-feature`)
-5. **📝 Open** a Pull Request
-
-### 📏 Coding Standards
-- ✅ Follow PEP 8
-- 📖 Add docstrings for functions
-- 🧪 Write unit tests for new code
-- 📚 Update documentation
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🏥 Medical Disclaimer
-
-<div align="center">
-<img src="https://img.shields.io/badge/⚠️-MEDICAL_DISCLAIMER-red?style=for-the-badge" alt="Medical Disclaimer">
-</div>
-
-> **Important**: This system is for **diagnostic assistance only** and does not replace professional medical advice. Always consult with qualified healthcare professionals for final treatment decisions.
-
----
-
-## 📞 Contact
-
-<div align="center">
-
-**👨‍💻 Author**: [Your Name]
-
-[![Email](https://img.shields.io/badge/Email-your.email@example.com-blue?style=for-the-badge&logo=gmail)](mailto:your.email@example.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/yourprofile)
-[![Website](https://img.shields.io/badge/Website-Visit-green?style=for-the-badge&logo=safari)](https://yourwebsite.com)
-
-</div>
-
----
 
 ## 🙏 Acknowledgments
 
-- 🎯 **Dataset Providers**: APTOS, EyePACS, UCI ML Repository
+- 🎯 **Dataset Providers**: APTOS, EyePACS, UCI ML Repository, Mesidor
 - 🛠️ **Open Source Communities**: TensorFlow, scikit-learn
 - 👨‍⚕️ **Medical Experts**: Ophthalmologists who validated our results
 - 🤖 **Discord Community**: For testing and feedback
