@@ -1929,7 +1929,15 @@ graph TD
 ```
 ## 🚀 Installation
 ### You can test discord bot if you download this files and don't tranning meta-learning and clinical model:
-  
+
+| Tên File                                         | Mô Tả                          | Link                                                                                                                    |
+| ------------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `config.json`                                    | Cấu hình mô hình               | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/config.json)                                    |
+| `main_clinical_model.pth`                        | Trọng số mô hình chính         | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/main_clinical_model.pth)                        |
+| `meta_model_maml_fomaml_best_weights.weights.h5` | Trọng số mô hình meta-learning | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/Download/meta_model_maml_fomaml_best_weights.weights.h5) |
+| `chat-bot.py`                                    | Bot trò chuyện AI              | [Tải xuống](https://github.com/hungle2006/Diabetes-AI/raw/main/chat-bot.py)                                             |
+
+
 
 ### 📋 System Requirements
 <div align="center">
