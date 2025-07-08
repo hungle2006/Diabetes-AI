@@ -1500,7 +1500,6 @@ This severity labeling system can be used for:
 - Missing data is handled gracefully by excluding those indicators from the calculation
 - The system is designed to be interpretable and clinically meaningful
 
-## 🚀 Installation
 ### 📦 Clinical data processing source code
 
 - [📥 Download `TrainingWiDS2021.py`](https://raw.githubusercontent.com/hungle2006/Diabetes-AI/main/clinical-data/process-data/TrainingWiDS2021.py)
@@ -1928,7 +1927,9 @@ graph TD
     I --> J[Discord Response]
     I --> K[Web Interface]
 ```
-
+## 🚀 Installation
+### You can test discord bot if you download this files and don't tranning meta-learning and clinical model:
+  
 
 ### 📋 System Requirements
 <div align="center">
