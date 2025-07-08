@@ -17,14 +17,7 @@
 - [✨ Features](#-features)
 - [🏗️ System Architecture](#️-system-architecture)
 - [🚀 Installation](#-installation)
-- [💻 Usage](#-usage)
 - [📁 Data](#-data)
-- [📊 Results](#-results)
-- [🔧 Configuration](#-configuration)
-- [🧪 Testing](#-testing)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [📞 Contact](#-contact)
 
 ---
 
@@ -1950,82 +1943,6 @@ graph TD
 | 💿 Storage | 10GB+ for models and data |
 
 </div>
-
-### 🔧 Quick Setup
-
-```bash
-# 1️⃣ Clone the repository
-git clone https://github.com/yourusername/diabetes-detection-ai.git
-cd diabetes-detection-ai
-
-# 2️⃣ Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate     # Windows
-
-# 3️⃣ Install dependencies
-pip install -r requirements.txt
-pip install -e .
-
-# 4️⃣ Download pre-trained models (~2GB)
-python scripts/download_models.py
-```
-
----
-
-## 💻 Usage
-
-### 🌐 Web Application
-```bash
-python web_app/app.py
-```
-**➡️ Open browser at** `http://localhost:5000`
-
-### 🤖 Discord Bot
-```bash
-# Set up Discord bot token in .env
-DISCORD_BOT_TOKEN=your_bot_token_here
-
-# Run the bot
-python discord_bot/main.py
-```
-
-### 🔌 API Usage
-```python
-from src.inference import DiabetesDetector
-
-# Initialize detector
-detector = DiabetesDetector()
-
-# 👁️ Analyze retinal image
-image_path = "path/to/fundus_image.jpg"
-retinopathy_result = detector.predict_retinopathy(image_path)
-
-# 📊 Predict from clinical data
-clinical_data = {
-    'glucose': 120,
-    'bmi': 25.5,
-    'age': 45,
-    'blood_pressure': 130
-}
-diabetes_risk = detector.predict_diabetes_risk(clinical_data)
-
-# 📋 Display results
-print(f"🔍 Retinopathy severity: {retinopathy_result['severity']}")
-print(f"📊 Diabetes risk: {diabetes_risk['probability']:.2%}")
-```
-
-### ⚡ Batch Processing
-```bash
-# Process multiple images
-python scripts/batch_inference.py --input_dir data/test_images --output_dir results/
-
-# Process CSV clinical data
-python scripts/clinical_batch.py --input_file data/patients.csv --output_file results/predictions.csv
-```
-
----
 
 ## 📁 Data
 
